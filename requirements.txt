@@ -1,0 +1,8 @@
+itzi
+rasterio
+gdal
+shapely
+geopandas
+fiona
+pycrs
+pyproj
