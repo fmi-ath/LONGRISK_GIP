@@ -1,0 +1,7 @@
+GRASS_itzi/
+.grass7/
+__pycache__/
+
+.bash_*
+.python_history
+*.py[cdo]
