@@ -48,65 +48,59 @@ class Landcover:
 
         new_arr = np.zeros(self._shape_)
 
+        # TODO: See if this double-loop can be rewritten using np.nditer function or indexing tricks
         for i in range(self._shape_[0]):
 
             for j in range(self._shape_[1]):
 
-                if (arr[i, j] >= 1) & (arr[i, j] <= 4):
+                element = arr[i, j]
 
-                    new_arr[i, j] = 0.08
+                if 1 <= element <= 4:
+                    friction_value = 0.08
 
-                elif (arr[i, j] >= 5) & (arr[i, j] <= 7):
+                elif 5 <= element <= 7:
+                    friction_value = 0.02
 
-                    new_arr[i, j] = 0.02
+                elif 8 <= element <= 9:
+                    friction_value = 0.05
 
-                elif (arr[i, j] >= 8) & (arr[i, j] <= 9):
+                elif 10 <= element <= 13:
+                    friction_value = 0.08
 
-                    new_arr[i, j] = 0.05
+                elif element == 14:
+                    friction_value = 0.04
 
-                elif (arr[i, j] >= 10) & (arr[i, j] <= 13):
+                elif element == 15:
+                    friction_value = 0.08
 
-                    new_arr[i, j] = 0.08
+                elif element == 16:
+                    friction_value = 0.03
 
-                elif arr[i, j] == 14:
+                elif 17 <= element <= 21:
+                    friction_value = 0.04
 
-                    new_arr[i, j] = 0.04
+                elif 22 <= element <= 29:
+                    friction_value = 0.1
 
-                elif arr[i, j] == 15:
+                elif 30 <= element <= 31:
+                    friction_value = 0.04
 
-                    new_arr[i, j] = 0.08
+                elif 32 <= element <= 36:
+                    friction_value = 0.05
 
-                elif arr[i, j] == 16:
+                elif 37 <= element <= 39:
+                    friction_value = 0.04
 
-                    new_arr[i, j] = 0.03
+                elif 40 <= element <= 45:
+                    friction_value = 0.06
 
-                elif (arr[i, j] >= 17) & (arr[i, j] <= 21):
+                elif 46 <= element <= 48:
+                    friction_value = 0.03
 
-                    new_arr[i, j] = 0.04
+                else:
+                    continue  # Skip unknown values
 
-                elif (arr[i, j] >= 22) & (arr[i, j] <= 29):
-
-                    new_arr[i, j] = 0.1
-
-                elif (arr[i, j] >= 30) & (arr[i, j] <= 31):
-
-                    new_arr[i, j] = 0.04
-
-                elif (arr[i, j] >= 32) & (arr[i, j] <= 36):
-
-                    new_arr[i, j] = 0.05
-
-                elif (arr[i, j] >= 37) & (arr[i, j] <= 39):
-
-                    new_arr[i, j] = 0.04
-
-                elif (arr[i, j] >= 40) & (arr[i, j] <= 45):
-
-                    new_arr[i, j] = 0.06
-
-                elif (arr[i, j] >= 46) & (arr[i, j] <= 48):
-
-                    new_arr[i, j] = 0.03
+                new_arr[i, j] = friction_value
 
         #geotransform = dataset.GetGeoTransform()
         output_file = os.path.join(self._root_.parent, 'friction.tif')
@@ -170,65 +164,15 @@ class Landcover:
 
         infiltration_arr = np.zeros(self._shape_)
 
-        for i in range(self._shape_[0]):
-
-            for j in range(self._shape_[1]):
-
-                if (arr[i, j] >= 1) & (arr[i, j] <= 7):
-
-                    if imperviousness_arr[i, j] < 65:
-
-                        coef = 0.65
-
-                    elif imperviousness_arr[i, j] > 95:
-
-                        coef = 0.95
-
-                    else:
-
-                        coef = imperviousness_arr[i, j] / 100
-
-                    infiltration_arr[i, j] = coef
-
-                elif (arr[i, j] >= 8) & (arr[i, j] <= 10):
-
-                    infiltration_arr[i, j] = 0.05
-
-                elif arr[i, j] == 11:
-
-                    if imperviousness_arr[i, j] < 65:
-
-                        coef = 0.65
-
-                    elif imperviousness_arr[i, j] > 95:
-
-                        coef = 0.95
-
-                    else:
-
-                        coef = imperviousness_arr[i, j] / 100
-
-                    infiltration_arr[i, j] = coef
-
-                elif (arr[i, j] >= 12) & (arr[i, j] <= 15):
-
-                    infiltration_arr[i, j] = 0.2
-
-                elif (arr[i, j] >= 16) & (arr[i, j] <= 20):
-
-                    infiltration_arr[i, j] = 0.2
-
-                elif (arr[i, j] >= 21) & (arr[i, j] <= 36):
-
-                    infiltration_arr[i, j] = 0.1
-
-                elif (arr[i, j] >= 37) & (arr[i, j] <= 45):
-
-                    infiltration_arr[i, j] = 0.05
-
-                elif (arr[i, j] >= 46) & (arr[i, j] <= 48):
-
-                    infiltration_arr[i, j] = 1
+        # TODO: I wonder if this is faster than the previous double loop? Here we have ~18 numpy loops...
+        infiltration_arr[(arr >= 1) & (arr <= 7)] = np.clip(imperviousness_arr[(arr >= 1) & (arr <= 7)], 65, 95) / 100
+        infiltration_arr[(arr >= 8) & (arr <= 10)] = 0.05
+        infiltration_arr[arr==11] = np.clip(imperviousness_arr[arr==11], 65, 95) / 100
+        infiltration_arr[(arr >= 12) & (arr <= 15)] = 0.2
+        infiltration_arr[(arr >= 16) & (arr <= 20)] = 0.2
+        infiltration_arr[(arr >= 21) & (arr <= 36)] = 0.1
+        infiltration_arr[(arr >= 37) & (arr <= 45)] = 0.05
+        infiltration_arr[(arr >= 46) & (arr <= 48)] = 0.05
 
         infiltration_arr = 1 - infiltration_arr # Infiltration coefficients from runoff coefficients
 
