@@ -1,3 +1,4 @@
+from pathlib import Path
 import numpy as np
 import rasterio
 from rasterio.warp import calculate_default_transform, reproject, Resampling
@@ -160,7 +161,7 @@ def rain_relocation(GTiff_files_path, xmin, ymax, X_target, Y_target, X_radar_ra
             GTiff relocated file
     """
 
-    if os.path.splitext(os.path.split(GTiff_files_path)[1])[1] == '':
+    if not Path(GTiff_files_path).suffix:
 
         if not isinstance(search_criteria, list):
 

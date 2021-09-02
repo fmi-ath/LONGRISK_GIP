@@ -1,4 +1,7 @@
-import os, glob
+import os
+import glob
+from pathlib import Path
+
 from osgeo import gdal, osr
 import numpy as np
 import modules.utils as utl
@@ -20,14 +23,13 @@ class Landcover:
         geotransform = dataset.GetGeoTransform()
         band = dataset.GetRasterBand(1)
         arr = band.ReadAsArray()
-        shape = np.shape(arr)
 
-        self._root_ = root_landcover_file
+        self._root_ = Path(root_landcover_file).resolve() # Resolve to remove relative paths
         self._arr_ = arr
-        self._shape_ = shape
+        self._shape_ = arr.shape
         self._geotransform_ = geotransform
         self._crs_code_ = int(proj.GetAttrValue('AUTHORITY',1)) # it returns a string consisting of the EPSG number
-        self._crs_ = 'EPSG:' + str(self._crs_code_)
+        self._crs_ = f'EPSG:{self._crs_code_}'
 
     def get_friction(self):
 
@@ -259,7 +261,7 @@ class Landcover:
 
         if infiltration_rate:
 
-            if os.path.splitext(os.path.split(rain_file_path)[1])[1] == '':
+            if not Path(rain_file_path).suffix:
 
                 rain_files = sorted(glob.glob(os.path.join(rain_file_path, '*.tif')))
 

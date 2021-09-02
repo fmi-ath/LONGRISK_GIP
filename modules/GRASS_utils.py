@@ -1,3 +1,5 @@
+# pylint: disable=import-error  # GRASS is installed inside container, not in athras -> pylint doesn't find it
+from pathlib import Path
 import os, glob
 import numpy as np
 from datetime import datetime, timedelta
@@ -111,7 +113,7 @@ def import_multiple_raster_files(path, search_criteria = '*.tif'):
 
     for name in glob.iglob(files_path):
 
-        gcore.run_command('r.in.gdal', input = name, output = os.path.splitext(os.path.split(name)[1])[0])
+        gcore.run_command('r.in.gdal', input = name, output = Path(name).stem)
 
     return
 
