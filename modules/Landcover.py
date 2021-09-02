@@ -4,7 +4,6 @@ from pathlib import Path
 
 from osgeo import gdal, osr
 import numpy as np
-import modules.utils as utl
 
 class Landcover:
 
@@ -110,18 +109,8 @@ class Landcover:
                     new_arr[i, j] = 0.03
 
         #geotransform = dataset.GetGeoTransform()
-        output_file = os.path.join(os.path.split(self._root_)[0], 'friction.tif')
-
-        output_raster = gdal.GetDriverByName('GTiff').Create(output_file, self._shape_[1], self._shape_[0], 1 ,gdal.GDT_Float32)  # Open the file
-        output_raster.SetGeoTransform(self._geotransform_)  # Specify its coordinates
-        srs = osr.SpatialReference()                 # Establish its coordinate encoding
-        srs.ImportFromEPSG(self._crs_code_)
-
-        output_raster.SetProjection( srs.ExportToWkt() )   # Exports the coordinate system
-                                                           # to the file
-        output_raster.GetRasterBand(1).WriteArray(new_arr)   # Writes my array to the raster
-
-        output_raster.FlushCache()
+        output_file = os.path.join(self._root_.parent, 'friction.tif')
+        self._write_raster_file(output_file, new_arr)
 
         return
 
@@ -143,20 +132,8 @@ class Landcover:
 
         new_arr = np.where(((arr >= 1) & (arr <= 7)) + (arr == 11), 10, 0)
 
-        output_file = os.path.join(os.path.split(self._root_)[0], 'losses.tif')
-
-        #geotransform = dataset.GetGeoTransform()
-        output_raster = gdal.GetDriverByName('GTiff').Create(output_file, self._shape_[1], self._shape_[0], 1 ,gdal.GDT_Float32)  # Open the file
-        output_raster.SetGeoTransform(self._geotransform_)  # Specify its coordinates
-        srs = osr.SpatialReference()                 # Establish its coordinate encoding
-        srs.ImportFromEPSG(self._crs_code_)                     # This one specifies WGS84 lat long.
-                                                     # Anyone know how to specify the
-                                                     # IAU2000:49900 Mars encoding?
-        output_raster.SetProjection( srs.ExportToWkt() )   # Exports the coordinate system
-                                                           # to the file
-        output_raster.GetRasterBand(1).WriteArray(new_arr)   # Writes my array to the raster
-
-        output_raster.FlushCache()
+        output_file = os.path.join(self._root_.parent, 'losses.tif')
+        self._write_raster_file(output_file, new_arr)
 
         return
 
@@ -188,10 +165,6 @@ class Landcover:
         arr = self._arr_
 
         dataset = gdal.Open(imperviousness_file_path, gdal.GA_ReadOnly) # Note GetRasterBand() takes band no. starting from 1 not 0
-        proj = osr.SpatialReference(wkt = dataset.GetProjection())
-        CRS_code = proj.GetAttrValue('AUTHORITY',1)
-
-        geotransform = dataset.GetGeoTransform()
         band = dataset.GetRasterBand(1)
         imperviousness_arr = band.ReadAsArray()
 
@@ -272,24 +245,11 @@ class Landcover:
         else:
 
             output_file = os.path.join(output_folder, 'infiltration.tif')
-
-            output_raster = gdal.GetDriverByName('GTiff').Create(output_file, self._shape_[1], self._shape_[0], 1 ,gdal.GDT_Float32)  # Open the file
-            output_raster.SetGeoTransform(self._geotransform_)  # Specify its coordinates
-            srs = osr.SpatialReference()                 # Establish its coordinate encoding
-            srs.ImportFromEPSG(self._crs_code_)                     # This one specifies WGS84 lat long.
-                                                         # Anyone know how to specify the
-                                                         # IAU2000:49900 Mars encoding?
-            output_raster.SetProjection( srs.ExportToWkt() )   # Exports the coordinate system
-                                                               # to the file
-            output_raster.GetRasterBand(1).WriteArray(infiltration_arr)   # Writes my array to the raster
-
-            output_raster.FlushCache()
+            self._write_raster_file(output_file, infiltration_arr)
 
             return
 
-        i = 0
-
-        for t in rain_files:
+        for i, t in enumerate(rain_files):
 
             rain_dataset = gdal.Open(t, gdal.GA_ReadOnly) # Note GetRasterBand() takes band no. starting from 1 not 0
             rainband = rain_dataset.GetRasterBand(1)
@@ -302,21 +262,30 @@ class Landcover:
             #file_name = os.path.splitext(os.path.split(t)[1])[0]
             #file_time = file_name[4:8]
 
-            #geotransform = dataset.GetGeoTransform()
-            output_file = os.path.join(output_folder, 'infiltration_' + str(i).zfill(4) + '.tif')
-
-            output_raster = gdal.GetDriverByName('GTiff').Create(output_file, self._shape_[1], self._shape_[0], 1 ,gdal.GDT_Float32)  # Open the file
-            output_raster.SetGeoTransform(self._geotransform_)  # Specify its coordinates
-            srs = osr.SpatialReference()                 # Establish its coordinate encoding
-            srs.ImportFromEPSG(self._crs_code_)                     # This one specifies WGS84 lat long.
-                                                         # Anyone know how to specify the
-                                                         # IAU2000:49900 Mars encoding?
-            output_raster.SetProjection( srs.ExportToWkt() )   # Exports the coordinate system
-                                                               # to the file
-            output_raster.GetRasterBand(1).WriteArray(infil_rate)   # Writes my array to the raster
-
-            output_raster.FlushCache()
-
-            i += 1
+            output_file = os.path.join(output_folder, 'infiltration_{:0>4}.tif'.format(i))
+            self._write_raster_file(output_file, infil_rate)
 
         return
+
+
+    def _write_raster_file(self, filename, array, dtype=gdal.GDT_Float32):
+        """Convenience function to write a calculated raster to a GeoTiff file.
+
+        Args:
+            filename (str): Path to the output file
+            array (numpy.array): Raster image to-be-written
+            dtype (gdal constant, optional): GDAL Data type for the file. Defaults to gdal.GDT_Float32.
+        """
+        driver = gdal.GetDriverByName('GTiff')
+
+        raster = driver.Create(filename, self._shape_[1], self._shape_[0], 1, dtype)
+        raster.SetGeoTransform(self._geotransform_)  # Specify its coordinates
+
+        srs = osr.SpatialReference()                 # Establish its coordinate encoding
+        srs.ImportFromEPSG(self._crs_code_)
+
+        raster.SetProjection( srs.ExportToWkt() )   # Exports the coordinate system to the file
+        raster.GetRasterBand(1).WriteArray(array)   # Writes my array to the raster
+
+        raster.FlushCache()
+        raster = None
