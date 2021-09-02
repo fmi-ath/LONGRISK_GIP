@@ -25,9 +25,7 @@ def initiate_GRASS_sesion(mygisdb, mylocation, mymapset, CRS_code = 4326):
             Optional CRS for the current session.
     """
 
-    if isinstance(CRS_code, int):
-
-        CRS_code = str(CRS_code)
+    crs_as_epsg = f'EPSG:{CRS_code}'
 
     os.environ.update(dict(GRASS_COMPRESS_NULLS = '1', GRASS_COMPRESSOR = 'ZSTD'))
 
@@ -35,7 +33,7 @@ def initiate_GRASS_sesion(mygisdb, mylocation, mymapset, CRS_code = 4326):
     PERMANENT = Session()
     # hint: EPSG code lookup: https://epsg.io
     PERMANENT.open(gisdb = mygisdb, location = mylocation,
-                   create_opts = 'EPSG:' + CRS_code)
+                   create_opts = crs_as_epsg)
 
     if mymapset == 'PERMANENT':
 
@@ -45,7 +43,7 @@ def initiate_GRASS_sesion(mygisdb, mylocation, mymapset, CRS_code = 4326):
 
     user = Session()
     user.open(gisdb = mygisdb, location = mylocation, mapset = mymapset,
-                   create_opts = 'EPSG:' + CRS_code)
+                   create_opts = crs_as_epsg)
 
     return user
 
@@ -184,7 +182,7 @@ def create_rain_raster_text_file(rain_raster_path, output_file, search_criteria 
             new_raster = os.path.splitext(tail)[0]
 
             #print('hour: %d, minute: %d' % (hour, minute))
-            f.write(new_raster + '|' + initial_time.strftime("%Y-%m-%d %H:%M") + '|' + current_time.strftime("%Y-%m-%d %H:%M") + '\n')
+            f.write(f'{new_raster}|{initial_time:%Y-%m-%d %H:%M}|{current_time:%Y-%m-%d %H:%M}\n')
 
             initial_time = current_time
             current_time += delta
@@ -229,30 +227,30 @@ def create_itzi_config_file(output_file, grass_bin = None, grassdata = None, loc
 
     if (start_time is not None) and (end_time is not None):
         # Start of the simulation. Format yyyy-mm-dd HH:MM
-        f.write('start_time = ' + start_time + '\n')
+        f.write(f'start_time = {start_time}\n')
         # End of the simulation. Format yyyy-mm-dd HH:MM
-        f.write('end_time = ' + end_time + '\n')
+        f.write(f'end_time = {end_time}\n')
 
     elif (start_time is not None) and (duration is not None):
         # Start of the simulation. Format yyyy-mm-dd HH:MM
-        f.write('start_time = ' + start_time + '\n')
+        f.write(f'start_time = {start_time}\n')
         # Duration of the simulation. Format HH:MM:SS
-        f.write('duration = ' + duration + '\n')
+        f.write(f'duration = {duration}\n')
 
     elif duration is not None:
         # Duration of the simulation. Format HH:MM:SS
-        f.write('duration = ' + duration + '\n')
+        f.write(f'duration = {duration}\n')
 
     else:
 
-        time_error_message = ('Possible combinations for time:\n' +
-                                '- start_time and end_time\n' +
-                                '- start_time and duration\n' +
-                                '- duration only\n')
+        time_error_message = ('Possible combinations for time:\n'
+                              '- start_time and end_time\n'
+                              '- start_time and duration\n'
+                              '- duration only\n')
         raise ValueError(time_error_message)
 
     # Duration between two records. Format HH:MM:SS
-    f.write('record_step = ' + record_step + '\n')
+    f.write(f'record_step = {record_step}\n')
 
     f.write('\n[input]\n')
 
@@ -260,23 +258,21 @@ def create_itzi_config_file(output_file, grass_bin = None, grassdata = None, loc
 
         if args[k] is not None:
 
-            f.write(k + ' = ' + args[k] + '\n')
+            f.write(f'{k} = {args[k]}\n')
 
     f.write('\n[output]\n')
 
-    f.write('prefix = ' + prefix + '\n')
+    f.write(f'prefix = {prefix}\n')
 
     f.write('values = ')
 
-    for v in values[:-1]:
+    f.write(', '.join(values))
 
-        f.write(v + ', ')
-
-    f.write(values[-1] + '\n')
+    f.write('\n')
 
     f.write('\n[statistics]\n')
 
-    f.write('stats_file = ' + stats_file + '\n')
+    f.write(f'stats_file = {stats_file}\n')
 
     f.write('\n[options]\n')
 
@@ -284,7 +280,7 @@ def create_itzi_config_file(output_file, grass_bin = None, grassdata = None, loc
 
         if args[k] is not None:
 
-            f.write(k + ' = ' + args[k] + '\n')
+            f.write(f'{k} = {args[k]}\n')
 
     f.write('\n[drainage]\n')
 
@@ -292,7 +288,7 @@ def create_itzi_config_file(output_file, grass_bin = None, grassdata = None, loc
 
         if args[k] is not None:
 
-            f.write(k + ' = ' + args[k] + '\n')
+            f.write(f'{k} = {args[k]}\n')
 
     f.write('\n[grass]\n')
 
@@ -300,7 +296,7 @@ def create_itzi_config_file(output_file, grass_bin = None, grassdata = None, loc
 
         if args[k] is not None:
 
-            f.write(k + ' = ' + args[k] + '\n')
+            f.write(f'{k} = {args[k]}\n')
 
     f.close()
 
@@ -334,7 +330,7 @@ def GRASS_export_rasters(output_path, mapset, search_criteria = '*'):
 
     for raster in raster_list:
 
-        new_path = os.path.join(output_path, raster + '.tif')
+        new_path = os.path.join(output_path, f'{raster}.tif')
 
         gcore.run_command('r.out.gdal', input = raster, output = new_path, format = 'GTiff')
 

@@ -46,12 +46,12 @@ else:
         try:
             lx.append(float(t))
         except ValueError:
-            raise ValueError('Polygon coords should be float or integer, not ' + t)
+            raise ValueError(f'Polygon coords should be float or integer, not {t}')
     for t in y_coords.split():
         try:
             ly.append(float(t))
         except ValueError:
-            raise ValueError('Polygon coords should be float or integer, not ' + t)
+            raise ValueError(f'Polygon coords should be float or integer, not {t}')
 
     crop_polygon_coords = [(lx[i], ly[i]) for i in range(len(lx))]
 

@@ -21,14 +21,14 @@ mylocation = config.get('grass_info', 'mylocation')
 mymapset = config.get('grass_info', 'mymapset')
 CRS = config.getint('grass_info', 'CRS')
 prefix = config.get('grass_output', 'prefix')
-if prefix == '':
-    prefix = mymapset + '_itzi'
+if not prefix:
+    prefix = f'{mymapset}_itzi'
 
 user = grutl.initiate_GRASS_sesion(mygisdb, mylocation, mymapset, CRS_code = CRS)
 
 output_path = 'GRASS_itzi/itzi_files'
 
-grutl.GRASS_export_rasters(output_path, mymapset, search_criteria = prefix + '*')
+grutl.GRASS_export_rasters(output_path, mymapset, search_criteria = f'{prefix}*')
 
 grutl.end_GRASS_sesion(user)
 
