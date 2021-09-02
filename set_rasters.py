@@ -1,9 +1,14 @@
-import modules.Landcover as LC
-import modules.utils as utl
+import sys
+import os
+import glob
+from configparser import ConfigParser
+
 from rasterio.plot import show
 import rasterio
-from configparser import ConfigParser
-import sys, os, glob
+from rasterio.windows import crop
+
+import modules.Landcover as LC
+import modules.utils as utl
 
 """
 We read the input information from the ini file and then the magic happens
@@ -24,22 +29,15 @@ Cropping utilities
 crop_vector_file = config.get('cropping', 'shapefile_file_path')
 crop_polygon_crs = config.get('cropping', 'polygon_crs')
 
-if crop_vector_file == '':
-
+if not crop_vector_file:
     crop_vector_file = None
 
-if crop_polygon_crs == '':
-
+if not crop_polygon_crs:
     crop_polygon_crs = None
 
-if (config.get('cropping', 'x_polygon_coords') == '') or (config.get('cropping', 'y_polygon_coords') == ''):
-
-    crop_polygon_coords = None
-
-else:
-
-    x_coords = config.get('cropping', 'x_polygon_coords')
-    y_coords = config.get('cropping', 'y_polygon_coords')
+x_coords = config.get('cropping', 'x_polygon_coords', fallback='')
+y_coords = config.get('cropping', 'y_polygon_coords', fallback='')
+if x_coords and y_coords:
     lx = []
     ly = []
     for t in x_coords.split():
@@ -53,12 +51,14 @@ else:
         except ValueError:
             raise ValueError(f'Polygon coords should be float or integer, not {t}')
 
-    crop_polygon_coords = [(lx[i], ly[i]) for i in range(len(lx))]
+    crop_polygon_coords = list(zip(lx, ly))
+
+else:
+    crop_polygon_coords = None
 
 null_value = config.getfloat('cropping', 'mask_value')
 
-if null_value == '':
-
+if not null_value:
     null_value = -9999.
 
 """
@@ -70,19 +70,13 @@ if null_value == '':
 
 if config.getboolean('merging', 'DEM_merge_boolean'):
 
-    #rasters_folder_path = '/home/aldana/Documents/FMI/Surface_flow_modelling/grassdata/NLS_Finland_data/rasters'
     rasters_folder_path = config.get('merging', 'DEM_file_path_to_merge')
-    #merged_file_path = '/home/aldana/Documents/FMI/Surface_flow_modelling/grassdata/temp/rasters/DEM_merged.tif'
     merged_file_path = 'GRASS_itzi/temp/DEM_merged.tif'
     merge_search_criteria = config.get('merging', 'DEM_merge_search_criteria')
 
     dsc = config.get('merging', 'DEM_merge_search_criteria')
 
-    merge_search_criteria = []
-
-    for t in dsc.split():
-
-        merge_search_criteria.append(t)
+    merge_search_criteria = dsc.split()
 
     utl.raster_merge(rasters_folder_path, merged_file_path, search_criteria = merge_search_criteria)
 
@@ -104,22 +98,18 @@ else:
 
 if config.getboolean('cropping', 'DEM_crop_boolean'):
 
-    #raster_to_crop_path = '/home/aldana/Documents/FMI/Surface_flow_modelling/grassdata/temp/rasters/Helsinki_merged.tif'
-    #cropped_file_path = '/home/aldana/Documents/FMI/Surface_flow_modelling/grassdata/temp/rasters/Helsinki_cropped.tif'
     dem_cropped_file_path = 'GRASS_itzi/grassdata/DEM_cropped.tif'
     crop_search_criteria = config.get('cropping', 'DEM_crop_search_criteria')
 
-    #min_lat = 60.168
-    #min_lon = 24.933
-    #max_lat = 60.176
-    #max_lon = 24.96
-    #polygon_coords = [(min_lon, min_lat), (min_lon, max_lat), (max_lon, max_lat), (max_lon, min_lat), (min_lon, min_lat)]
-    #polygon_crs = 4326
-    #null_value = -9999.
-
-    utl.raster_crop(raster_to_crop_path, cropped_file_path = dem_cropped_file_path, search_criteria = crop_search_criteria,
-                    vector_file = crop_vector_file, polygon_coords = crop_polygon_coords, polygon_crs = crop_polygon_crs, mask_value = null_value,
-                    mask_all_touched = True)
+    utl.raster_crop(raster_to_crop_path,
+                    cropped_file_path = dem_cropped_file_path,
+                    search_criteria = crop_search_criteria,
+                    vector_file = crop_vector_file,
+                    polygon_coords = crop_polygon_coords,
+                    polygon_crs = crop_polygon_crs,
+                    mask_value = null_value,
+                    mask_all_touched = True
+                   )
 
 # If you would like to visualize it
 #show(rasterio.open(cropped_file_path), cmap='terrain')
@@ -131,42 +121,31 @@ if config.getboolean('cropping', 'DEM_crop_boolean'):
 ascii_files_path = config.get('rain', 'ascii_files_path')
 GTiff_files_path = config.get('rain', 'GTiff_files_path')
 
-xmin = config.getfloat('rain', 'x_min')
-ymax = config.getfloat('rain', 'y_max')
-EPSG_code = config.getint('rain', 'EPSG_code')
+try:
+    xmin = config.getfloat('rain', 'x_min')
+    ymax = config.getfloat('rain', 'y_max')
+    EPSG_code = config.getint('rain', 'EPSG_code')
+except ValueError:
+    raise ValueError('xmin, ymax and EPSG_code are mandatory')
+
 xmax = config.get('rain', 'x_max')
 ymin = config.get('rain', 'y_min')
+# FIXME: Fails if keys are provided but no value (cannot convert '' to float)
 xrotation = config.getfloat('rain', 'x_rotation')
 xres = config.getfloat('rain', 'x_res')
 yrotation = config.getfloat('rain', 'y_rotation')
 yres = config.getfloat('rain', 'y_res')
 
-if (xmin == '') or (ymax == '') or (EPSG_code == ''):
+xmax = float(xmax) if xmax else None
+ymin = float(ymin) if ymin else None
 
-    raise ValueError('xmin, ymax and EPSG_code are mandatory')
+xres = float(xres) if xres else None  # FIXME: Obsolete if getfloat() is used above
+yres = float(yres) if yres else None
 
-if xmax == '':
-    xmax = None
-else:
-    xmax = float(xmax)
-if ymin == '':
-    ymin = None
-else:
-    ymin = float(ymin)
-if xres == '':
-    xres = None
-else:
-    xres = float(xres)
-if yres == '':
-    yres = None
-else:
-    yres = float(yres)
-
-if GTiff_files_path != '':
-
+if GTiff_files_path:
     rain_crop_search_criteria = config.get('rain', 'rain_crop_search_criteria')
 
-elif not ascii_files_path == '':
+elif ascii_files_path:
 
     print('\nRain data is in ascii format and its being converted to Tif format...\n')
 
@@ -247,18 +226,12 @@ if config.getboolean('rain', 'rain_crop_boolean'):
 
 if config.getboolean('merging', 'landcover_merge_boolean'):
 
-    #rasters_folder_path = '/home/aldana/Documents/FMI/Surface_flow_modelling/grassdata/NLS_Finland_data/rasters'
     landcover_folder_path = config.get('merging', 'landcover_file_path_to_merge')
-    #merged_file_path = '/home/aldana/Documents/FMI/Surface_flow_modelling/grassdata/temp/rasters/DEM_merged.tif'
     merged_file_path = 'GRASS_itzi/temp/landcover_merged.tif'
 
     lsc = config.get('merging', 'landcover_merge_search_criteria')
 
-    merge_search_criteria = []
-
-    for t in lsc.split():
-
-        merge_search_criteria.append(t)
+    merge_search_criteria = lsc.split()
 
     utl.raster_merge(landcover_folder_path, merged_file_path, search_criteria = merge_search_criteria)
 
@@ -316,11 +289,7 @@ if config.getboolean('imperviousness', 'imperviousness_file_boolean'):
 
         isc = config.get('merging', 'imperviousness_merge_search_criteria')
 
-        merge_search_criteria = []
-
-        for t in isc.split():
-
-            merge_search_criteria.append(t)
+        merge_search_criteria = isc.split()
 
         utl.raster_merge(imperviousness_folder_path, merged_file_path, search_criteria = merge_search_criteria)
 

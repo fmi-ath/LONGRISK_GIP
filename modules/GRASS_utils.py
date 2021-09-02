@@ -156,7 +156,7 @@ def create_rain_raster_text_file(rain_raster_path, output_file, search_criteria 
 
         for file in glob.iglob(files_path):
 
-            head, tail = os.path.split(file)
+            _, tail = os.path.split(file)
 
             #print(tail)
             new_raster = os.path.splitext(tail)[0]
@@ -178,7 +178,7 @@ def create_rain_raster_text_file(rain_raster_path, output_file, search_criteria 
 
         for file in sorted(glob.iglob(files_path)):
 
-            head, tail = os.path.split(file)
+            _, tail = os.path.split(file)
 
             #print(tail)
             new_raster = os.path.splitext(tail)[0]

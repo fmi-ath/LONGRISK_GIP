@@ -1,3 +1,4 @@
+# pylint: disable=import-error
 import modules.GRASS_utils as grutl
 # import some convenient GRASS GIS Python API parts
 from grass.script import core as gcore
@@ -118,11 +119,9 @@ end_time = config.get('grass_time', 'end_time')
 record_step = config.get('grass_time', 'record_step')
 duration = config.get('grass_time', 'duration')
 dem = config.get('grass_input', 'dem')
-if dem == '':
-    dem = 'DEM_cropped'
+dem = dem or 'DEM_cropped'
 friction = config.get('grass_input', 'friction')
-if friction == '':
-    friction = 'friction'
+friction = friction or 'friction'
 rain = stds
 start_h = config.get('grass_input', 'start_h')
 start_y = config.get('grass_input', 'start_y')
@@ -130,7 +129,7 @@ inflow = config.get('grass_input', 'inflow')
 bctype = config.get('grass_input', 'bctype')
 bcval = config.get('grass_input', 'bcval')
 infiltration = config.get('grass_input', 'infiltration')
-if infiltration == '':
+if not infiltration:
 
     if config.getboolean('rain', 'infiltration_rate'):
 
@@ -159,15 +158,16 @@ if infiltration == '':
         infiltration = 'infiltration_0'
 
 losses = config.get('grass_input', 'losses')
-if losses == '':
-    losses = 'losses'
+losses =  losses or 'losses'
+
 prefix = config.get('grass_output', 'prefix')
-if prefix == '':
-    prefix = mymapset + '_itzi'
+prefix = prefix or f'{mymapset}_itzi'
+
 values = config.get('grass_output', 'values')
+
 stats_file = config.get('grass_statistics', 'stats_file')
-if stats_file == '':
-    stats_file = 'GRASS_itzi/' + mymapset + '_itzi.csv'
+stats_file = stats_file or f'GRASS_itzi/{mymapset}_itzi.csv'
+
 hmin = config.get('grass_options', 'hmin')
 slmax = config.get('grass_options', 'slmax')
 cfl = config.get('grass_options', 'cfl')
