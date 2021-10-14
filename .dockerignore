@@ -1,2 +1,7 @@
 .git
+.gitignore
 *.py[cdo]
+.grass7
+GRASS_itzi
+.*_history
+*_docker.sh

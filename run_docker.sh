@@ -4,10 +4,17 @@ name="longrisk-gip"
 srcbindpoint=/usr/src/app/
 databindpoint=/data/
 datafolder=${PWD%/*}/data
+# Limit container's resource usage
+cpus='10'
+memory='32g'
+memory_swap='33g' # True swap amount is memory_swap - memory.
 
 docker run -it --rm \
     --user=$(id -u):$(id -g) \
     --name=$name \
+    --cpus=$cpus \
+    --memory=$memory \
+    --memory-swap=$memory_swap \
     --volume ${PWD}:$srcbindpoint \
     --volume $datafolder:$databindpoint:ro \
     --env HOME=$srcbindpoint \
