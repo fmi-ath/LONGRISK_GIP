@@ -1,5 +1,6 @@
 # pylint: disable=import-error  # GRASS is installed inside container, not in athras -> pylint doesn't find it
 from pathlib import Path
+import configparser
 import os, glob
 import numpy as np
 from datetime import datetime, timedelta
@@ -223,86 +224,91 @@ def create_itzi_config_file(output_file, grass_bin = None, grassdata = None, loc
 
     args = locals()
 
-    f = open(output_file, "w")
+    # [9:22]
+    input_kws = ("dem", "friction", "start_h", "start_y", "rain", "inflow", "bctype", "bcval",
+                 "infiltration", "effective_porosity", "capillary_pressure", "hydraulic_conductivity",
+                 "losses")
+    # [25:32]
+    options_kws = ('hmin', 'slmax', 'cfl', 'theta', 'vrouting', 'dtmax', 'dtinf')
+    # [32:37]
+    drainage_kws = ("swmm_inp", "output", "orifice_coeff", "free_weir_coeff", "submerged_weir_coeff")
+    # [1:5] + [37:]
+    grass_kws = ("grass_bin", "grassdata", "location", "mapset", "region", "mask")
 
-    f.write('[time]\n')
+    config = configparser.ConfigParser()
 
+    #? TIME SECTION
+    secname = 'time'
+    config.add_section(secname)
+
+    # start_time -- Start of the simulation. Format yyyy-mm-dd HH:MM
+    # end_time -- End of the simulation. Format yyyy-mm-dd HH:MM
+    # duration -- Duration of the simulation. Format HH:MM:SS
+    # record_step -- Duration between two records. Format HH:MM:SS
     if (start_time is not None) and (end_time is not None):
-        # Start of the simulation. Format yyyy-mm-dd HH:MM
-        f.write(f'start_time = {start_time}\n')
-        # End of the simulation. Format yyyy-mm-dd HH:MM
-        f.write(f'end_time = {end_time}\n')
-
+        config.set(secname, 'start_time', str(start_time))
+        config.set(secname, 'end_time', str(end_time))
     elif (start_time is not None) and (duration is not None):
-        # Start of the simulation. Format yyyy-mm-dd HH:MM
-        f.write(f'start_time = {start_time}\n')
-        # Duration of the simulation. Format HH:MM:SS
-        f.write(f'duration = {duration}\n')
-
+        config.set(secname, 'start_time', str(start_time))
+        config.set(secname, 'duration', str(duration))
     elif duration is not None:
-        # Duration of the simulation. Format HH:MM:SS
-        f.write(f'duration = {duration}\n')
-
+        config.set('time', 'duration', str(duration))
     else:
-
         time_error_message = ('Possible combinations for time:\n'
                               '- start_time and end_time\n'
                               '- start_time and duration\n'
                               '- duration only\n')
         raise ValueError(time_error_message)
 
-    # Duration between two records. Format HH:MM:SS
-    f.write(f'record_step = {record_step}\n')
+    config.set(secname, 'record_step', str(record_step))
 
-    f.write('\n[input]\n')
+    #? INPUT SECTION
+    secname = 'input'
+    config.add_section(secname)
 
-    for k in list(args.keys())[9:22]:
+    for k in input_kws:
+        if args.get(k) is not None:
+            config.set(secname, k, str(args[k]))
 
-        if args[k] is not None:
+    #? OUTPUT SECTION
+    secname = 'output'
+    config.add_section(secname)
+    config.set(secname, 'prefix', str(prefix))
+    values = values if values is not None else []
+    config.set(secname, 'values', ', '.join(values))
 
-            f.write(f'{k} = {args[k]}\n')
+    #? STATISTICS SECTION
+    secname = 'statistics'
+    config.add_section(secname)
+    config.set(secname, 'stats_file', str(stats_file))
 
-    f.write('\n[output]\n')
+    #? OPTIONS SECTION
+    secname = 'options'
+    config.add_section(secname)
 
-    f.write(f'prefix = {prefix}\n')
+    for k in options_kws:
+        if args.get(k) is not None:
+            config.set(secname, k, str(args[k]))
 
-    f.write('values = ')
+    #? DRAINAGE SECTION
+    secname = 'drainage'
+    config.add_section(secname)
 
-    f.write(', '.join(values))
+    for k in drainage_kws:
+        if args.get(k) is not None:
+            config.set(secname, k, str(args[k]))
 
-    f.write('\n')
+    #? GRASS SECTION
+    secname = 'grass'
+    config.add_section(secname)
 
-    f.write('\n[statistics]\n')
+    for k in grass_kws:
+        if args.get(k) is not None:
+            config.set(secname, k, str(args[k]))
 
-    f.write(f'stats_file = {stats_file}\n')
-
-    f.write('\n[options]\n')
-
-    for k in list(args.keys())[25:32]:
-
-        if args[k] is not None:
-
-            f.write(f'{k} = {args[k]}\n')
-
-    f.write('\n[drainage]\n')
-
-    for k in list(args.keys())[32:37]:
-
-        if args[k] is not None:
-
-            f.write(f'{k} = {args[k]}\n')
-
-    f.write('\n[grass]\n')
-
-    for k in list(args.keys())[1:5] + list(args.keys())[37:]:
-
-        if args[k] is not None:
-
-            f.write(f'{k} = {args[k]}\n')
-
-    f.close()
-
-    return
+    # Write config to file
+    with open(output_file, "w", encoding='utf-8') as f:
+        config.write(f, space_around_delimiters=True)
 
 #def GRASS_export_rasters(raster_path, output_path, search_criteria = '*'):
 def GRASS_export_rasters(output_path, mapset, search_criteria = '*'):
