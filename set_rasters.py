@@ -3,16 +3,14 @@ import os
 import glob
 from configparser import ConfigParser
 
-from rasterio.plot import show
-import rasterio
-from rasterio.windows import crop
+import rasterio as rio
 
 import modules.Landcover as LC
 import modules.utils as utl
 
-"""
-We read the input information from the ini file and then the magic happens
-"""
+#* ---
+#* We read the input information from the ini file and then the magic happens
+#* ---
 
 ini_config_file = sys.argv[1]
 
@@ -22,9 +20,9 @@ config = ConfigParser()
 # parse existing file
 config.read(ini_config_file)
 
-"""
-Cropping utilities
-"""
+#* ---
+#* Cropping utilities
+#* ---
 
 crop_vector_file = config.get('cropping', 'shapefile_file_path')
 crop_polygon_crs = config.get('cropping', 'polygon_crs')
@@ -43,13 +41,13 @@ if x_coords and y_coords:
     for t in x_coords.split():
         try:
             lx.append(float(t))
-        except ValueError:
-            raise ValueError(f'Polygon coords should be float or integer, not {t}')
+        except ValueError as e:
+            raise ValueError(f'Polygon coords should be float or integer, not {t}') from e
     for t in y_coords.split():
         try:
             ly.append(float(t))
-        except ValueError:
-            raise ValueError(f'Polygon coords should be float or integer, not {t}')
+        except ValueError as e:
+            raise ValueError(f'Polygon coords should be float or integer, not {t}') from e
 
     crop_polygon_coords = list(zip(lx, ly))
 
@@ -61,12 +59,12 @@ null_value = config.getfloat('cropping', 'mask_value')
 if not null_value:
     null_value = -9999.
 
-"""
-1. Downdload DEMs of interest:
-    - 2x2 DEM files downloaded from https://tiedostopalvelu.maanmittauslaitos.fi/tp/kartta?lang=en
-2. If the region of interest lays in the intersection of different DEMs, we can merge them into a single
-   GeoTiff file:
-"""
+#* ---
+#* 1. Downdload DEMs of interest:
+#*     - 2x2 DEM files downloaded from https://tiedostopalvelu.maanmittauslaitos.fi/tp/kartta?lang=en
+#* 2. If the region of interest lays in the intersection of different DEMs, we can merge them into a single
+#*    GeoTiff file:
+#* ---
 
 if config.getboolean('merging', 'DEM_merge_boolean'):
 
@@ -87,14 +85,14 @@ else:
     raster_to_crop_path = config.get('cropping', 'DEM_file_path_to_crop')
 
 # If you would like to visualize it
-#show(rasterio.open(merged_file_path), cmap='terrain')
+#rio.plot.show(rasterio.open(merged_file_path), cmap='terrain')
 
-"""
-3. We would probably like to do the analysis over a specific region and not the entire map. Therefore, we proceed
-   to crop the file according to a given polygon cooredinates or vector shapefile.
-
-   If vector file not given, then buth polygon coordinates and crs MUST be given
-"""
+#* ---
+#* 3. We would probably like to do the analysis over a specific region and not the entire map. Therefore, we proceed
+#*    to crop the file according to a given polygon cooredinates or vector shapefile.
+#*
+#*    If vector file not given, then buth polygon coordinates and crs MUST be given
+#* ---
 
 if config.getboolean('cropping', 'DEM_crop_boolean'):
 
@@ -112,11 +110,11 @@ if config.getboolean('cropping', 'DEM_crop_boolean'):
                    )
 
 # If you would like to visualize it
-#show(rasterio.open(cropped_file_path), cmap='terrain')
+#rio.plot.show(rasterio.open(cropped_file_path), cmap='terrain')
 
-"""
-4. Now we proceed to extract the rain rasters
-"""
+#* ---
+#* 4. Now we proceed to extract the rain rasters
+#* ---
 
 ascii_files_path = config.get('rain', 'ascii_files_path')
 GTiff_files_path = config.get('rain', 'GTiff_files_path')
@@ -125,8 +123,8 @@ try:
     xmin = config.getfloat('rain', 'x_min')
     ymax = config.getfloat('rain', 'y_max')
     EPSG_code = config.getint('rain', 'EPSG_code')
-except ValueError:
-    raise ValueError('xmin, ymax and EPSG_code are mandatory')
+except ValueError as e:
+    raise ValueError('xmin, ymax and EPSG_code are mandatory') from e
 
 xmax = config.get('rain', 'x_max')
 ymin = config.get('rain', 'y_min')
@@ -179,9 +177,9 @@ if config.get('rain', 'rain_relocation'):
 
     print('\nDONE\n')
 
-"""
-5. Let's check if the rain rasters have same projection as raster of interest
-"""
+#* ---
+#* 5. Let's check if the rain rasters have same projection as raster of interest
+#* ---
 
 reference_file_path = 'GRASS_itzi/grassdata/DEM_cropped.tif'
 
@@ -214,15 +212,15 @@ if config.getboolean('rain', 'rain_crop_boolean'):
 
     print('\nDONE\n')
 
-"""
-6. We now turn to landuse information to define: friction, losses and infiltration.
-   Landuse information for Finland downloaded from: https://www.avoindata.fi/data/fi/dataset/corine-maanpeite-2018
-   The file provides the different classes of the terrain with 20x20 m resolution
-
-   Let's first check whether if the landcover map has the same projection as our DEM raster
-   *As I already ran it once, reprojection was needed and I will skip it as it takes some minutes to reproject.
-   But if its for the first time, do it!
-"""
+#* ---
+#* 6. We now turn to landuse information to define: friction, losses and infiltration.
+#*    Landuse information for Finland downloaded from: https://www.avoindata.fi/data/fi/dataset/corine-maanpeite-2018
+#*    The file provides the different classes of the terrain with 20x20 m resolution
+#*
+#*    Let's first check whether if the landcover map has the same projection as our DEM raster
+#*    *As I already ran it once, reprojection was needed and I will skip it as it takes some minutes to reproject.
+#*    But if its for the first time, do it!
+#* ---
 
 if config.getboolean('merging', 'landcover_merge_boolean'):
 
@@ -255,9 +253,9 @@ if reproj:
     utl.raster_reproject(landcover_to_crop_path, reproj_fp = root_reproj_landcover_file, ref_fp = dem_cropped_file_path)
     landcover_to_crop_path = root_reproj_landcover_file
 
-"""
-7. Let's crop the landcover file before extracting the information we need
-"""
+#* ---
+#* 7. Let's crop the landcover file before extracting the information we need
+#* ---
 
 if config.getboolean('cropping', 'landcover_crop_boolean'):
 
@@ -270,9 +268,9 @@ if config.getboolean('cropping', 'landcover_crop_boolean'):
                     vector_file = crop_vector_file, polygon_coords = crop_polygon_coords, polygon_crs = crop_polygon_crs, mask_value = null_value,
                     mask_all_touched = True)
 
-"""
-8. Now we intialize the Landcover class and extract friction, losses and infiltration
-"""
+#* ---
+#* 8. Now we intialize the Landcover class and extract friction, losses and infiltration
+#* ---
 
 landcover = LC.Landcover(landcover_cropped_file_path)
 

@@ -2,11 +2,11 @@ import modules.GRASS_utils as grutl
 from configparser import ConfigParser
 import sys
 
-"""
-We read the input information from the ini file and then the magic happens.
-
-This script exports the rasters generated from itzi simulation to .tif files
-"""
+#* ---
+#* We read the input information from the ini file and then the magic happens.
+#*
+#* This script exports the rasters generated from itzi simulation to .tif files
+#* ---
 
 ini_config_file = sys.argv[1]
 
