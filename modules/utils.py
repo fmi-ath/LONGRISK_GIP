@@ -1,17 +1,42 @@
+import os
+import glob
+import json
+from math import floor
 from pathlib import Path
+
 import numpy as np
 import rasterio
 from rasterio.warp import calculate_default_transform, reproject, Resampling
 from rasterio.mask import mask
 from rasterio.merge import merge
+from rasterio.windows import crop
 from shapely.geometry import Polygon
 import geopandas as gpd
 from fiona.crs import from_epsg
-import pycrs
-from pyproj import Proj, transform
 from osgeo import gdal, osr
-import os, glob
-from math import floor
+
+def _ensure_list(list_or_any):
+    """'string' -> ['string']"""
+    if not isinstance(list_or_any, list):
+        return [list_or_any]
+    return list_or_any
+
+def _glob_path(search_path, search_criteria):
+    if Path(search_path).suffix == '':
+        search_criteria = _ensure_list(search_criteria)
+
+        path = []
+
+        for hints in search_criteria:
+            # Make a search criteria to select the DEM files
+            q = os.path.join(search_path, hints)
+            # glob function can be used to list files from a directory with specific criteria
+            path.extend(glob.glob(q))
+
+    else:
+        path = glob.glob(search_path)
+
+    return path
 
 def ascii_to_geotiff(ascii_files_path, GTiff_files_path, xmin, ymax, search_criteria = '*.txt', CRS_code = 3067,
     xmax = None, xrotation = 0, xres = None, yrotation = 0, ymin = None, yres = None):
@@ -51,31 +76,11 @@ def ascii_to_geotiff(ascii_files_path, GTiff_files_path, xmin, ymax, search_crit
         out : file
             GTiff converted file
     """
+    path = _glob_path(ascii_files_path, search_criteria)
 
-    if os.path.splitext(os.path.split(ascii_files_path)[1])[1] == '':
+    for filename in path:
 
-        if not isinstance(search_criteria, list):
-
-            search_criteria = [search_criteria]
-
-        path = []
-
-        for hints in search_criteria:
-
-            # Make a search criteria to select the DEM files
-            q = os.path.join(ascii_files_path, hints)
-            #print(q)
-
-            # glob function can be used to list files from a directory with specific criteria
-            path += glob.glob(q)
-
-    else:
-
-        path = glob.glob(raster_to_crop_path)
-
-    for file in path:
-
-        array = np.genfromtxt(file, dtype=np.float32)
+        array = np.genfromtxt(filename, dtype=np.float32)
 
         nrows, ncols = np.shape(array)
 
@@ -96,9 +101,9 @@ def ascii_to_geotiff(ascii_files_path, GTiff_files_path, xmin, ymax, search_crit
             raise AttributeError('If yres not given, ymin has to be given')
 
         # Upper-left corner coordinates
-        geotransform = (xmin, xres, xrotation, ymax, yrotation, -yres)
+        geotransform = (xmin, xres, xrotation, ymax, yrotation, -1 * yres)
 
-        GTiff_destination_file = os.path.join(GTiff_files_path, os.path.splitext(os.path.split(file)[1])[0] + '.tif')
+        GTiff_destination_file = os.path.join(GTiff_files_path, Path(filename).with_suffix('.tif').name)
 
         output_raster = gdal.GetDriverByName('GTiff').Create(GTiff_destination_file, ncols, nrows, 1 ,gdal.GDT_Float32)  # Open the file
         output_raster.SetGeoTransform(geotransform)  # Specify its coordinates
@@ -111,15 +116,15 @@ def ascii_to_geotiff(ascii_files_path, GTiff_files_path, xmin, ymax, search_crit
         output_raster.GetRasterBand(1).WriteArray(array)   # Writes my array to the raster
 
         output_raster.FlushCache()
+        output_raster = None
 
-    return
 
 def rain_relocation(GTiff_files_path, xmin, ymax, X_target, Y_target, X_radar_rain,
-                    Y_radar_rain, search_criteria = '*.txt', CRS_code = 3067, xmax = None, xrotation = 0,
-                    xres = None, yrotation = 0, ymin = None, yres = None):
+                    Y_radar_rain, search_criteria ='*.txt', CRS_code=3067, xmax=None, xrotation=0,
+                    xres=None, yrotation=0, ymin=None, yres=None):
 
-    """Relocates a desired pixel region of the image (X_radar_rain, Y_radar_rain) to a desired region (X_target, Y_target).
-        Produces a new GTiff file.
+    """Relocates a desired pixel region of the image (X_radar_rain, Y_radar_rain) to a desired
+    region (X_target, Y_target). Produces a new GTiff file.
 
         Parameters
         ----------
@@ -160,32 +165,12 @@ def rain_relocation(GTiff_files_path, xmin, ymax, X_target, Y_target, X_radar_ra
         out : file
             GTiff relocated file
     """
+    path = _glob_path(GTiff_files_path, search_criteria)
 
-    if not Path(GTiff_files_path).suffix:
+    for filename in path:
 
-        if not isinstance(search_criteria, list):
-
-            search_criteria = [search_criteria]
-
-        path = []
-
-        for hints in search_criteria:
-
-            # Make a search criteria to select the DEM files
-            q = os.path.join(GTiff_files_path, hints)
-            #print(q)
-
-            # glob function can be used to list files from a directory with specific criteria
-            path += glob.glob(q)
-
-    else:
-
-        path = glob.glob(GTiff_files_path)
-
-    for file in path:
-
-        dataset = gdal.Open(file, gdal.GA_ReadOnly) # Note GetRasterBand() takes band no. starting from 1 not 0
-        proj = osr.SpatialReference(wkt = dataset.GetProjection())
+        dataset = gdal.Open(filename, gdal.GA_ReadOnly) # Note GetRasterBand() takes band no. starting from 1 not 0
+        # proj = osr.SpatialReference(wkt = dataset.GetProjection())
         geotransform = dataset.GetGeoTransform()
         band = dataset.GetRasterBand(1)
         array = band.ReadAsArray()
@@ -229,9 +214,9 @@ def rain_relocation(GTiff_files_path, xmin, ymax, X_target, Y_target, X_radar_ra
         Ymax = y_new - (Y - Y_target)
 
         # Upper-left corner coordinates
-        geotransform = (Xmin, xres, xrotation, Ymax, yrotation, -yres)
+        geotransform = (Xmin, xres, xrotation, Ymax, yrotation, -1*yres)
 
-        GTiff_destination_file = os.path.join(GTiff_files_path, os.path.splitext(os.path.split(file)[1])[0] + '_relocated.tif')
+        GTiff_destination_file = os.path.join(GTiff_files_path, Path(filename).stem + '_relocated.tif')
 
         output_raster = gdal.GetDriverByName('GTiff').Create(GTiff_destination_file, ncols, nrows, 1 ,gdal.GDT_Float32)  # Open the file
         output_raster.SetGeoTransform(geotransform)  # Specify its coordinates
@@ -271,42 +256,33 @@ def raster_check_projection(dst_fp, ref_fp = None, optional_crs = None):
     reproj = False
 
     if ref_fp is not None:
-
-        m = ' and (reference file) ' + os.path.splitext(os.path.split(ref_fp)[1])[0]
+        m = f' and (reference file) {Path(ref_fp).name}'
 
     elif optional_crs is not None:
+        m = f' and (reference CRS) {optional_crs}'
 
-        m = ' and (reference CRS) ' + optional_crs
-
-    print('\nChecking projection consistency between: (source file) ' + os.path.splitext(os.path.split(dst_fp)[1])[0] + m)
+    print(f'\nChecking projection consistency between: (source file) {Path(dst_fp).name} {m}')
 
     with rasterio.open(dst_fp) as src:
-
         if ref_fp is not None:
-
             with rasterio.open(ref_fp) as data:
-
                 if data.crs != src.crs:
-
                     reproj = True
-                    message = '\n--> Files have different projection:\n' + '\n  Reference CRS: ' + str(data.crs) + '\n  Source CRS: ' + str(src.crs)
+                    message = f'\n--> Files have different projection:\n\n  Reference CRS: {data.crs}\n  Source CRS: {src.crs}'
 
         elif (ref_fp is None) and (optional_crs is not None):
-
             if optional_crs != src.crs:
-
                 reproj = True
-                message = '\n--> File has different projection to the one specified:\n' + '\n   Reference CRS: ' + optional_crs + '\n   Source CRS: ' + str(src.crs)
+                message = f'\n--> File has different projection to the one specified:\n\n   Reference CRS: {optional_crs}\n   Source CRS: {src.crs}'
 
         else:
-
             raise AttributeError('Indicate either a reference file or optional crs to compare projection')
 
     print(message)
 
     return reproj
 
-def raster_reproject(dst_fp, reproj_fp = None, ref_fp = None, optional_crs = None, search_criteria = '*.tif'):
+def raster_reproject(dst_fp, reproj_fp=None, ref_fp=None, optional_crs=None, search_criteria='*.tif'):
 
     """
     Based on:
@@ -335,82 +311,55 @@ def raster_reproject(dst_fp, reproj_fp = None, ref_fp = None, optional_crs = Non
     """
 
     if ref_fp is not None:
-
         with rasterio.open(ref_fp) as data:
-
             ref_crs = data.crs
-
-    elif (ref_fp is None) and (optional_crs is not None):
-
+    elif optional_crs is not None:
         ref_crs = optional_crs
-
     else:
-
         raise AttributeError('Indicate either a reference file or optional crs reproject')
 
-    if os.path.splitext(os.path.split(dst_fp)[1])[1] == '':
-
-        if not isinstance(search_criteria, list):
-
-            search_criteria = [search_criteria]
-
-        path = []
-
-        for hints in search_criteria:
-
-            # Make a search criteria to select the DEM files
-            q = os.path.join(dst_fp, hints)
-            #print(q)
-
-            # glob function can be used to list files from a directory with specific criteria
-            path += glob.glob(q)
-
-    else:
-
-        path = glob.glob(dst_fp)
+    path = _glob_path(dst_fp, search_criteria)
 
     for input_file in path:
+        input_file = Path(input_file)
 
         with rasterio.open(input_file) as src:
 
-            if ref_crs != src.crs:
+            if ref_crs == src.crs:
+                continue
 
-                transform, width, height = calculate_default_transform(
-                    src.crs, ref_crs, src.width, src.height, *src.bounds)
-                kwargs = src.meta.copy()
-                kwargs.update({
-                    'crs': ref_crs,
-                    'transform': transform,
-                    'width': width,
-                    'height': height
-                })
+            transform, width, height = calculate_default_transform(
+                src.crs, ref_crs, src.width, src.height, *src.bounds
+            )
 
-                if reproj_fp is not None:
+            kwargs = src.meta.copy()
+            kwargs.update({
+                'crs': ref_crs,
+                'transform': transform,
+                'width': width,
+                'height': height
+            })
 
-                    if os.path.splitext(os.path.split(reproj_fp)[1])[1] == '':
-
-                        output_fp = os.path.join(reproj_fp, os.path.splitext(os.path.split(input_file)[1])[0] + '_reproj.tif')
-
-                    else:
-
-                        output_fp = reproj_fp
-
+            if reproj_fp is not None:
+                if Path(reproj_fp).suffix == '':
+                    output_fp = os.path.join(reproj_fp, f'{input_file.stem}_reproj.tif')
                 else:
+                    output_fp = reproj_fp
 
-                    output_fp = os.path.join(os.path.split(input_file)[0], os.path.splitext(os.path.split(input_file)[1])[0] + '_reproj.tif')
+            else:
+                output_fp = input_file.with_name(f'{input_file.stem}_reproj.tif')
 
-                with rasterio.open(output_fp, 'w', **kwargs) as dst:
-                    for i in range(1, src.count + 1):
-                        reproject(
-                            source=rasterio.band(src, i),
-                            destination=rasterio.band(dst, i),
-                            src_transform=src.transform,
-                            src_crs=src.crs,
-                            dst_transform=transform,
-                            dst_crs=ref_crs,
-                            resampling=Resampling.nearest)
-
-    return
+            with rasterio.open(output_fp, 'w', **kwargs) as dst:
+                for i in range(1, src.count + 1):
+                    reproject(
+                        source=rasterio.band(src, i),
+                        destination=rasterio.band(dst, i),
+                        src_transform=src.transform,
+                        src_crs=src.crs,
+                        dst_transform=transform,
+                        dst_crs=ref_crs,
+                        resampling=Resampling.nearest
+                    )
 
 def raster_merge(rasters_folder_path, merged_file_path, search_criteria = "L*.tif"):
 
@@ -439,21 +388,9 @@ def raster_merge(rasters_folder_path, merged_file_path, search_criteria = "L*.ti
     # File and folder paths
     out_fp = os.path.join(merged_file_path)
 
-    if not isinstance(search_criteria, list):
-
-        search_criteria = [search_criteria]
-
-    dem_fps = []
-
-    for hints in search_criteria:
-
-        # Make a search criteria to select the DEM files
-        q = os.path.join(rasters_folder_path, hints)
-        #print(q)
-
-        # glob function can be used to list files from a directory with specific criteria
-        dem_fps += glob.glob(q)
-
+    # Remove any suffix to replicate pre-refactoring behaviour here
+    path_no_suffix = Path(rasters_folder_path).with_suffix('')
+    dem_fps = _glob_path(path_no_suffix, search_criteria)
     # Files that were found:
     #print(dem_fps)
 
@@ -467,25 +404,8 @@ def raster_merge(rasters_folder_path, merged_file_path, search_criteria = "L*.ti
 
     #print(src_files_to_mosaic)
 
-    """
-    # Create 4 plots next to each other
-    fig, (ax1, ax2, ax3, ax4) = plt.subplots(ncols=4, nrows=1, figsize=(12, 4))
-
-    # Plot first four files
-    show(src_files_to_mosaic[0], ax=ax1)
-    show(src_files_to_mosaic[1], ax=ax2)
-    show(src_files_to_mosaic[2], ax=ax3)
-    show(src_files_to_mosaic[3], ax=ax4)
-
-    # Do not show y-ticks values in last three axis
-    for ax in [ax2, ax3, ax4]:
-        ax.yaxis.set_visible(False)
-    """
     # Merge function returns a single mosaic array and the transformation info
     mosaic, out_trans = merge(src_files_to_mosaic)
-
-    # Plot the result
-    #show(mosaic, cmap='terrain')
 
     # Copy the metadata
     out_meta = src.meta.copy()
@@ -506,19 +426,14 @@ def raster_merge(rasters_folder_path, merged_file_path, search_criteria = "L*.ti
     with rasterio.open(out_fp, "w", **out_meta) as dest:
         dest.write(mosaic)
 
-    return
 
 def getFeatures(gdf):
+    """Function to parse features from GeoDataFrame in such a manner that rasterio wants them
 
+    Based on: https://autogis-site.readthedocs.io/en/latest/notebooks/Raster/clipping-raster.html
     """
-    Based on:
-    https://autogis-site.readthedocs.io/en/latest/notebooks/Raster/clipping-raster.html?highlight=crop
-
-    Function to parse features from GeoDataFrame in such a manner that rasterio wants them
-    """
-
-    import json
     return [json.loads(gdf.to_json())['features'][0]['geometry']]
+
 
 def raster_crop(raster_to_crop_path, cropped_file_path = None, search_criteria = "*.tif",
                 vector_file = None, polygon_coords = None, polygon_crs = None, mask_value = -9999.,
@@ -561,39 +476,21 @@ def raster_crop(raster_to_crop_path, cropped_file_path = None, search_criteria =
     """
 
     if vector_file is not None:
-
         geo = gpd.read_file(vector_file)
 
     elif (polygon_coords is not None) and (polygon_crs is not None):
-
-        geo = gpd.GeoDataFrame({'geometry': Polygon(polygon_coords)}, index=[0], crs = from_epsg(polygon_crs))
+        geo = gpd.GeoDataFrame({'geometry': Polygon(polygon_coords)}, index=[0], crs=from_epsg(polygon_crs))
 
     else:
-
         raise AttributeError('Vector or Polygon needed for cropping')
 
-    if os.path.splitext(os.path.split(raster_to_crop_path)[1])[1] == '':
+    path = _glob_path(raster_to_crop_path, search_criteria)
 
-        if not isinstance(search_criteria, list):
-
-            search_criteria = [search_criteria]
-
-        path = []
-
-        for hints in search_criteria:
-
-            # Make a search criteria to select the DEM files
-            q = os.path.join(raster_to_crop_path, hints)
-            #print(q)
-
-            # glob function can be used to list files from a directory with specific criteria
-            path += glob.glob(q)
-
-    else:
-
-        path = glob.glob(raster_to_crop_path)
+    if cropped_file_path is not None:
+        cropped_file_path = Path(cropped_file_path)
 
     for input_file in path:
+        input_file = Path(input_file)
 
         # Read the data
         data = rasterio.open(input_file)
@@ -608,42 +505,35 @@ def raster_crop(raster_to_crop_path, cropped_file_path = None, search_criteria =
         #print(coords)
 
         # Clip the raster with Polygon
-        out_img, out_transform = mask(dataset = data, shapes = coords, crop = True, all_touched = mask_all_touched, nodata = mask_value)
+        out_img, out_transform = mask(dataset=data, shapes=coords, crop=True,
+                                      all_touched=mask_all_touched, nodata=mask_value)
 
         # Copy the metadata
-        out_meta = data.meta.copy()
+        out_meta = data.meta.copy()  # pylint: disable=no-member
         #print(out_meta)
 
         # Parse EPSG code
         #print(data.crs.data)
-        epsg_code = int(data.crs.data['init'][5:])
+        # epsg_code = int(data.crs.data['init'][5:]) # pylint: disable=no-member
         #print(epsg_code)
 
         out_meta.update({"driver": "GTiff",
                          "height": out_img.shape[1],
                          "width": out_img.shape[2],
                          "transform": out_transform,
-                         "crs": data.meta['crs']}
+                         "crs": data.meta['crs']} # pylint: disable=no-member
                                  )
 
         if cropped_file_path is not None:
-
-            if os.path.splitext(os.path.split(cropped_file_path)[1])[1] == '':
-
-                output_fp = os.path.join(cropped_file_path, os.path.splitext(os.path.split(input_file)[1])[0] + '_cropped.tif')
-
+            if not cropped_file_path.suffix:
+                output_fp = cropped_file_path / f'{input_file.stem}_cropped.tif'
             else:
-
                 output_fp = cropped_file_path
-
         else:
-
-            output_fp = os.path.join(os.path.split(input_file)[0], os.path.splitext(os.path.split(input_file)[1])[0] + '_cropped.tif')
+            output_fp = input_file.with_name(f'{input_file.stem}_cropped.tif')
 
         with rasterio.open(output_fp, "w", **out_meta) as dest:
-                dest.write(out_img)
-
-    return
+            dest.write(out_img)
 
 def vector_reproject(input_vector_file, reference_vector_file, output_file):
 
@@ -672,7 +562,6 @@ def vector_reproject(input_vector_file, reference_vector_file, output_file):
 
     geo1_reproj.to_file(output_file)
 
-    return
 
 def vector_intersection(vector_file_1, vector_file_2, output_file):
 
@@ -717,7 +606,6 @@ def vector_intersection(vector_file_1, vector_file_2, output_file):
 
     intersection.to_file(output_file)
 
-    return
 
 def set_raster_resolution(input_file, reference_file, output_file = None, binary = False, mask_value = None):
 
@@ -752,10 +640,12 @@ def set_raster_resolution(input_file, reference_file, output_file = None, binary
     ref_shape = np.shape(ref_array)
 
     ref_rows, ref_cols = ref_shape
+    band = None
+    dataset = None
 
     dataset = gdal.Open(input_file, gdal.GA_ReadOnly) # Note GetRasterBand() takes band no. starting from 1 not 0
     proj = osr.SpatialReference(wkt = dataset.GetProjection())
-    geotransform = dataset.GetGeoTransform()
+    # geotransform = dataset.GetGeoTransform()
     band = dataset.GetRasterBand(1)
     in_array = band.ReadAsArray()
 
@@ -763,10 +653,12 @@ def set_raster_resolution(input_file, reference_file, output_file = None, binary
 
     in_rows, in_cols = in_shape
 
+    band = None
+    dataset = None
+
     new_array = np.empty((in_rows, in_cols))
 
     if in_shape == ref_shape:
-
         return
 
     if in_rows > ref_rows:
@@ -787,7 +679,7 @@ def set_raster_resolution(input_file, reference_file, output_file = None, binary
 
                 for k in range(np.shape(data_rows)[1]):
 
-                    new_array[i, k] = np.bincount(data_cols[:, k]).argmax()
+                    new_array[i, k] = np.bincount(data_rows[:, k]).argmax()
 
                 j = i * ratio
 
@@ -889,5 +781,4 @@ def set_raster_resolution(input_file, reference_file, output_file = None, binary
     output_raster.GetRasterBand(1).WriteArray(new_array_2)   # Writes my array to the raster
 
     output_raster.FlushCache()
-
-    return
+    output_raster = None

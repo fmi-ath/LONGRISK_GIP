@@ -1,6 +1,7 @@
-import modules.GRASS_utils as grutl
-from configparser import ConfigParser
 import sys
+from configparser import ConfigParser
+
+import modules.GRASS_utils as grutl
 
 #* ---
 #* We read the input information from the ini file and then the magic happens.

@@ -1,3 +1,8 @@
+import os
+import sys
+from configparser import ConfigParser
+from subprocess import call
+
 # pylint: disable=import-error
 import modules.GRASS_utils as grutl
 # import some convenient GRASS GIS Python API parts
@@ -9,9 +14,6 @@ from grass.pygrass.modules.shortcuts import general as g
 from grass.pygrass.modules.shortcuts import raster as r
 from grass.pygrass.modules.shortcuts import vector as v
 from grass.pygrass.modules.shortcuts import temporal as t
-import os, sys, glob
-from configparser import ConfigParser
-from subprocess import call
 
 #* ---
 #* We read the input information from the ini file and then the magic happens

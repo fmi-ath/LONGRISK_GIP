@@ -1,9 +1,12 @@
 # pylint: disable=import-error  # GRASS is installed inside container, not in athras -> pylint doesn't find it
-from pathlib import Path
 import configparser
-import os, glob
-import numpy as np
+import os
+import glob
+from pathlib import Path
 from datetime import datetime, timedelta
+from re import sub
+
+import numpy as np
 from grass_session import Session
 from grass.script import core as gcore
 import grass.script as gscript
@@ -90,15 +93,11 @@ def check_remove_existing_files(mapset, search_criteria = '*', maps_remove = Tru
     t.list()
 
     if maps_remove:
-
         g.remove(type = 'all', pattern = '*', flags = 'fb')
         #g.remove(type = 'all', pattern = '*', flags = 'f')
 
     if datasets_remove:
-
         t.remove(flags = 'rf')
-
-    return
 
 def import_multiple_raster_files(path, search_criteria = '*.tif'):
 
@@ -113,14 +112,14 @@ def import_multiple_raster_files(path, search_criteria = '*.tif'):
     files_path = os.path.join(path, search_criteria)
 
     for name in glob.iglob(files_path):
-
         gcore.run_command('r.in.gdal', input = name, output = Path(name).stem)
 
-    return
 
-def create_rain_raster_text_file(rain_raster_path, output_file, search_criteria = '*.tif', start_time = None, increment_number = None, increment_unit = None):
+def create_rain_raster_text_file(rain_raster_path, output_file, search_criteria = '*.tif',
+                                 start_time = None, increment_number = None, increment_unit = None):
 
-    """Creates the text file needed for registering the rain rasters in the created space and time dataset for the simulation
+    """Creates the text file needed for registering the rain rasters in the created space and time
+    dataset for the simulation
 
         Parameters
         ----------
@@ -143,7 +142,7 @@ def create_rain_raster_text_file(rain_raster_path, output_file, search_criteria 
             Text file with rain raster names and time intervals if indicated
     """
 
-    f = open(output_file, "w")
+    f = open(output_file, "w", encoding='utf-8')
 
     files_path = os.path.join(rain_raster_path, search_criteria)
 
@@ -194,14 +193,28 @@ def create_rain_raster_text_file(rain_raster_path, output_file, search_criteria 
 
     return
 
-def create_itzi_config_file(output_file, grass_bin = None, grassdata = None, location = None, mapset = None, start_time = None,
-                            end_time = None, duration = None, record_step = None, dem = None, friction = None,
-                            start_h = None, start_y = None, rain = None, inflow = None, bctype = None,
-                            bcval = None, infiltration = None, effective_porosity = None, capillary_pressure = None,
-                            hydraulic_conductivity = None, losses = None, prefix = None, values = None,
-                            stats_file = None, hmin = None, slmax = None, cfl = None, theta = None, vrouting = None,
-                            dtmax = None, dtinf = None, swmm_inp = None, output = None, orifice_coeff = None,
-                            free_weir_coeff = None, submerged_weir_coeff = None, region = None, mask = None):
+def create_itzi_config_file(output_file, record_step=None, dem=None, friction=None,
+                            # input
+                            start_h=None, start_y=None, rain=None,
+                            inflow=None, bctype=None, bcval=None, infiltration=None,
+                            effective_porosity=None, capillary_pressure=None,
+                            hydraulic_conductivity=None, losses=None, #dem, friction
+                            # output
+                            prefix=None, values=None,
+                            # time
+                            start_time=None, end_time=None, duration=None, #record_step
+                            # statistics
+                            stats_file=None,
+                            # options
+                            hmin=None, slmax=None, cfl=None, theta=None,
+                            vrouting=None, dtmax=None, dtinf=None,
+                            # drainage
+                            swmm_inp=None, output=None,
+                            orifice_coeff=None, free_weir_coeff=None, submerged_weir_coeff=None,
+                            # grass
+                            grass_bin=None, grassdata=None, location=None, mapset=None,
+                            region=None, mask=None,
+                            ):
 
     """Creates the .ini file needed for running itzi simulation according to parameters specified by user.
         For this function, all parameters MUST be given as strings.
@@ -211,6 +224,9 @@ def create_itzi_config_file(output_file, grass_bin = None, grassdata = None, loc
         ----------
         output_file : str
             Name of the output .ini file.
+        record_step :
+        dem :
+        friction :
 
         Returns
         -------
@@ -219,23 +235,58 @@ def create_itzi_config_file(output_file, grass_bin = None, grassdata = None, loc
     """
 
     if (record_step is None) or (dem is None) or (friction is None):
-
         raise ValueError('record_step, dem and friction are mandatory arguments for the simulation')
 
-    args = locals()
+    input_kws = {
+        'dem': dem,
+        'friction': friction,
+        'start_h': start_h,
+        'start_y': start_y,
+        'rain': rain,
+        'inflow': inflow,
+        'bctype': bctype,
+        'bcval': bcval,
+        'infiltration': infiltration,
+        'effective_porosity': effective_porosity,
+        'capillary_pressure': capillary_pressure,
+        'hydraulic_conductivity': hydraulic_conductivity,
+        'losses': losses,
+    }
 
-    # [9:22]
-    input_kws = ("dem", "friction", "start_h", "start_y", "rain", "inflow", "bctype", "bcval",
-                 "infiltration", "effective_porosity", "capillary_pressure", "hydraulic_conductivity",
-                 "losses")
-    # [25:32]
-    options_kws = ('hmin', 'slmax', 'cfl', 'theta', 'vrouting', 'dtmax', 'dtinf')
-    # [32:37]
-    drainage_kws = ("swmm_inp", "output", "orifice_coeff", "free_weir_coeff", "submerged_weir_coeff")
-    # [1:5] + [37:]
-    grass_kws = ("grass_bin", "grassdata", "location", "mapset", "region", "mask")
+    options_kws = {
+        'hmin': hmin,
+        'slmax': slmax,
+        'cfl': cfl,
+        'theta': theta,
+        'vrouting': vrouting,
+        'dtmax': dtmax,
+        'dtinf': dtinf,
+    }
+
+    drainage_kws = {
+        "swmm_inp": swmm_inp,
+        "output": output,
+        "orifice_coeff": orifice_coeff,
+        "free_weir_coeff": free_weir_coeff,
+        "submerged_weir_coeff": submerged_weir_coeff,
+    }
+
+    grass_kws = {
+        "grass_bin": grass_bin,
+        "grassdata": grassdata,
+        "location": location,
+        "mapset": mapset,
+        "region": region,
+        "mask": mask,
+    }
 
     config = configparser.ConfigParser()
+
+    def _insert_in_loop(section_name, items):
+        config.add_section(section_name)
+        for key, value in items.items():
+            if value is not None:
+                config.set(section_name, key, str(value))
 
     #? TIME SECTION
     secname = 'time'
@@ -263,12 +314,7 @@ def create_itzi_config_file(output_file, grass_bin = None, grassdata = None, loc
     config.set(secname, 'record_step', str(record_step))
 
     #? INPUT SECTION
-    secname = 'input'
-    config.add_section(secname)
-
-    for k in input_kws:
-        if args.get(k) is not None:
-            config.set(secname, k, str(args[k]))
+    _insert_in_loop('input', input_kws)
 
     #? OUTPUT SECTION
     secname = 'output'
@@ -283,28 +329,13 @@ def create_itzi_config_file(output_file, grass_bin = None, grassdata = None, loc
     config.set(secname, 'stats_file', str(stats_file))
 
     #? OPTIONS SECTION
-    secname = 'options'
-    config.add_section(secname)
-
-    for k in options_kws:
-        if args.get(k) is not None:
-            config.set(secname, k, str(args[k]))
+    _insert_in_loop('options', options_kws)
 
     #? DRAINAGE SECTION
-    secname = 'drainage'
-    config.add_section(secname)
-
-    for k in drainage_kws:
-        if args.get(k) is not None:
-            config.set(secname, k, str(args[k]))
+    _insert_in_loop('drainage', drainage_kws)
 
     #? GRASS SECTION
-    secname = 'grass'
-    config.add_section(secname)
-
-    for k in grass_kws:
-        if args.get(k) is not None:
-            config.set(secname, k, str(args[k]))
+    _insert_in_loop('grass', grass_kws)
 
     # Write config to file
     with open(output_file, "w", encoding='utf-8') as f:
@@ -337,9 +368,5 @@ def GRASS_export_rasters(output_path, mapset, search_criteria = '*'):
     raster_list = gscript.list_grouped('rast', pattern = search_criteria)[mapset]
 
     for raster in raster_list:
-
         new_path = os.path.join(output_path, f'{raster}.tif')
-
-        gcore.run_command('r.out.gdal', input = raster, output = new_path, format = 'GTiff')
-
-    return
+        gcore.run_command('r.out.gdal', input=raster, output=new_path, format='GTiff')

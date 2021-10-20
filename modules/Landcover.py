@@ -6,6 +6,7 @@ from osgeo import gdal, osr
 import numpy as np
 
 class Landcover:
+    """Landcover object"""
 
     def __init__(self, root_landcover_file):
         """Initialize a Landcover object.
@@ -106,7 +107,6 @@ class Landcover:
         output_file = os.path.join(self._root_.parent, 'friction.tif')
         self._write_raster_file(output_file, new_arr)
 
-        return
 
     def get_losses(self):
 
@@ -129,7 +129,6 @@ class Landcover:
         output_file = os.path.join(self._root_.parent, 'losses.tif')
         self._write_raster_file(output_file, new_arr)
 
-        return
 
     def get_infiltration(self, imperviousness_file_path, rain_file_path, output_folder, infiltration_rate = True):
 
@@ -206,10 +205,8 @@ class Landcover:
             #file_name = os.path.splitext(os.path.split(t)[1])[0]
             #file_time = file_name[4:8]
 
-            output_file = os.path.join(output_folder, 'infiltration_{:0>4}.tif'.format(i))
+            output_file = os.path.join(output_folder, f'infiltration_{i:0>4}.tif')
             self._write_raster_file(output_file, infil_rate)
-
-        return
 
 
     def _write_raster_file(self, filename, array, dtype=gdal.GDT_Float32):
