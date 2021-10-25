@@ -67,9 +67,9 @@ if not null_value:
 
 #* ---
 #* 1. Downdload DEMs of interest:
-#*     - 2x2 DEM files downloaded from https://tiedostopalvelu.maanmittauslaitos.fi/tp/kartta?lang=en
-#* 2. If the region of interest lays in the intersection of different DEMs, we can merge them into a single
-#*    GeoTiff file:
+#*     - e.g. 2x2 DEM files from https://tiedostopalvelu.maanmittauslaitos.fi/tp/kartta?lang=en
+#* 2. If the region of interest lays in the intersection of different DEMs, we can merge them into a
+#*    single GeoTiff file:
 #* ---
 
 if config.getboolean('merging', 'DEM_merge_boolean'):
@@ -94,10 +94,11 @@ else:
 #rio.plot.show(rasterio.open(merged_file_path), cmap='terrain')
 
 #* ---
-#* 3. We would probably like to do the analysis over a specific region and not the entire map. Therefore, we proceed
-#*    to crop the file according to a given polygon cooredinates or vector shapefile.
+#* 3. We would probably like to do the analysis over a specific region and not the entire map.
+#*    Therefore, we proceed to crop the file according to a given polygon cooredinates or vector
+#*    shapefile.
 #*
-#*    If vector file not given, then buth polygon coordinates and crs MUST be given
+#*    If vector file not given, then both polygon coordinates and crs MUST be given
 #* ---
 
 if config.getboolean('cropping', 'DEM_crop_boolean'):
@@ -178,7 +179,7 @@ if config.get('rain', 'rain_relocation'):
     relocation_search_criteria = config.get('rain', 'relocation_search_criteria')
 
     utl.rain_relocation(GTiff_files_path, xmin, ymax, X_target, Y_target, X_radar_rain,
-                        Y_radar_rain, search_criteria=relocation_search_criteria, CRS_code=EPSG_code,
+                        Y_radar_rain, search_criteria=relocation_search_criteria,CRS_code=EPSG_code,
                         xmax=xmax, xrotation=xrotation, xres=xres,
                         yrotation=yrotation, ymin=ymin, yres=yres)
 
@@ -193,7 +194,7 @@ if config.get('rain', 'rain_relocation'):
 reference_file_path = os.path.join(grassdata_folder, 'DEM_cropped.tif')
 
 if Path(GTiff_files_path).suffix == '':
-    source_fname = next(glob.iglob(f"{GTiff_files_path}/*.tif"))  # Use glob iterator as we need only one file
+    source_fname = next(glob.iglob(f"{GTiff_files_path}/*.tif"))  # we need only one file
     reproj = utl.raster_check_projection(source_fname, ref_fp = reference_file_path)
 
 else:
@@ -225,11 +226,13 @@ if config.getboolean('rain', 'rain_crop_boolean'):
 
 #* ---
 #* 6. We now turn to landuse information to define: friction, losses and infiltration.
-#*    Landuse information for Finland downloaded from: https://www.avoindata.fi/data/fi/dataset/corine-maanpeite-2018
+#*    Landuse information for Finland downloaded from:
+#*    https://www.avoindata.fi/data/fi/dataset/corine-maanpeite-2018
 #*    The file provides the different classes of the terrain with 20x20 m resolution
 #*
 #*    Let's first check whether if the landcover map has the same projection as our DEM raster
-#*    *As I already ran it once, reprojection was needed and I will skip it as it takes some minutes to reproject.
+#*    *As I already ran it once, reprojection was needed and I will skip it as it takes some minutes
+#*     to reproject.
 #*    But if its for the first time, do it!
 #* ---
 
@@ -259,7 +262,8 @@ reproj = utl.raster_check_projection(landcover_to_crop_path, ref_fp = dem_croppe
 if reproj:
 
     print('\nReprojection needed for Landcover file to match DEM projection\n')
-    utl.raster_reproject(landcover_to_crop_path, reproj_fp = root_reproj_landcover_file, ref_fp = dem_cropped_file_path)
+    utl.raster_reproject(landcover_to_crop_path, reproj_fp=root_reproj_landcover_file,
+                         ref_fp=dem_cropped_file_path)
     landcover_to_crop_path = root_reproj_landcover_file
 
 #* ---
@@ -267,9 +271,6 @@ if reproj:
 #* ---
 
 if config.getboolean('cropping', 'landcover_crop_boolean'):
-
-    #raster_to_crop_path = '/home/aldana/Documents/FMI/Surface_flow_modelling/grassdata/temp/rasters/Helsinki_merged.tif'
-    #cropped_file_path = '/home/aldana/Documents/FMI/Surface_flow_modelling/grassdata/temp/rasters/Helsinki_cropped.tif'
     landcover_cropped_file_path = os.path.join(grassdata_folder, 'landcover_cropped.tif')
     crop_search_criteria = config.get('cropping', 'landcover_crop_search_criteria')
 
@@ -299,7 +300,8 @@ if config.getboolean('imperviousness', 'imperviousness_file_boolean'):
 
         merge_search_criteria = isc.split()
 
-        utl.raster_merge(imperviousness_folder_path, merged_file_path, search_criteria=merge_search_criteria)
+        utl.raster_merge(imperviousness_folder_path, merged_file_path,
+                         search_criteria=merge_search_criteria)
 
         imperviousness_file_path = merged_file_path
 
@@ -320,10 +322,11 @@ if config.getboolean('imperviousness', 'imperviousness_file_boolean'):
 
     if config.getboolean('cropping', 'imperviousness_crop_boolean'):
 
-        imperviousness_cropped_file_path = os.path.join(grassdata_folder, 'imperviousness_cropped.tif')
+        imperviousness_cropped_file_path = os.path.join(grassdata_folder,
+                                                        'imperviousness_cropped.tif')
         crop_search_criteria = config.get('cropping', 'imperviousness_crop_search_criteria')
 
-        utl.raster_crop(imperviousness_file_path, cropped_file_path=imperviousness_cropped_file_path,
+        utl.raster_crop(imperviousness_file_path,cropped_file_path=imperviousness_cropped_file_path,
                         search_criteria=crop_search_criteria, vector_file=crop_vector_file,
                         polygon_coords=crop_polygon_coords, polygon_crs=crop_polygon_crs,
                         mask_value=null_value, mask_all_touched=True)

@@ -126,8 +126,6 @@ def create_rain_raster_text_file(rain_raster_path, output_file, search_criteria 
             Text file with rain raster names and time intervals if indicated
     """
 
-    f = open(output_file, "w", encoding='utf-8')
-
     files_path = os.path.join(rain_raster_path, search_criteria)
 
     file_list = glob.glob(files_path)
@@ -136,33 +134,36 @@ def create_rain_raster_text_file(rain_raster_path, output_file, search_criteria 
 
     assert n_files != 0, 'There are no files in the path given'
 
+    f = open(output_file, "w", encoding='utf-8')
+
     if start_time is None:
 
-        for file in glob.iglob(files_path):
+        for filename in file_list:
 
-            _, tail = os.path.split(file)
+            _, tail = os.path.split(filename)
 
             #print(tail)
             new_raster = os.path.splitext(tail)[0]
 
             #print('hour: %d, minute: %d' % (hour, minute))
-            f.write(new_raster + '\n')
+            f.write(new_raster)
+            f.write('\n')
 
     else:
 
         if not isinstance(start_time, datetime):
 
             start_time = datetime.strptime(start_time, "%Y-%m-%d %H:%M")
-            print('The start_time was converted to datetime: ', start_time.strftime("%Y-%m-%d %H:%M"))
+            print(f'The start_time was converted to datetime: {start_time:%Y-%m-%d %H:%M}')
 
         delta = timedelta(**{increment_unit: increment_number})
 
         initial_time = start_time - delta
         current_time = start_time
 
-        for file in sorted(glob.iglob(files_path)):
+        for filename in sorted(file_list):
 
-            _, tail = os.path.split(file)
+            _, tail = os.path.split(filename)
 
             #print(tail)
             new_raster = os.path.splitext(tail)[0]
@@ -199,22 +200,24 @@ def create_itzi_config_file(output_file, record_step=None, dem=None, friction=No
                             region=None, mask=None,
                             ):
 
-    """Creates the .ini file needed for running itzi simulation according to parameters specified by user.
-        For this function, all parameters MUST be given as strings.
-        See itzi documentation for info about the parameters: itzi.readthedocs.io/
+    """Creates the .ini file needed for running itzi simulation according to parameters specified
+    by user.
 
-        Parameters
-        ----------
-        output_file : str
-            Name of the output .ini file.
-        record_step :
-        dem :
-        friction :
+    For this function, all parameters MUST be given as strings.
+    See itzi documentation for info about the parameters: itzi.readthedocs.io/
 
-        Returns
-        -------
-        out : file
-            Text file with parameters for itzi simnulation
+    Parameters
+    ----------
+    output_file : str
+        Name of the output .ini file.
+    record_step :
+    dem :
+    friction :
+
+    Returns
+    -------
+    out : file
+        Text file with parameters for itzi simnulation
     """
 
     if (record_step is None) or (dem is None) or (friction is None):

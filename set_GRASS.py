@@ -103,7 +103,7 @@ g.list(flags = 'p', type = 'raster')
 
 stds = 'rain_minutely'
 
-t.create(output = stds, semantictype = 'mean', title = 'Rain Rate', description = 'Rain rate data for itzi')
+t.create(output=stds, semantictype='mean', title='Rain Rate', description='Rain rate data for itzi')
 
 #* ---
 #* 6. Import the minutely recorded radar rain events.
@@ -127,15 +127,16 @@ start_time = grass_time.get('start_time')
 increment_number = int(grass_time.get('increment_number'))
 increment_unit = grass_time.get('increment_unit')
 
-grutl.create_rain_raster_text_file(rain_path, rain_txt_file, search_criteria = '*.tif', start_time = start_time,
-                                    increment_number = increment_number, increment_unit = increment_unit)
+grutl.create_rain_raster_text_file(rain_path, rain_txt_file, search_criteria='*.tif',
+                                   start_time=start_time, increment_number=increment_number,
+                                   increment_unit=increment_unit)
 
 t.register(type = 'raster', input = stds, file = str(rain_txt_file))
 
 #* ---
-#* 8. We now create the izti configuration file to run the simulation. Here we set all the parameters we need
-#*    and call the respective rasters and dataset we would like to use for the simulation. All the parameters
-#*    must be strings
+#* 8. We now create the izti configuration file to run the simulation. Here we set all the
+#*    parameters we need and call the respective rasters and dataset we would like to use for the
+#*    simulation. All the parameters must be strings.
 #* ---
 
 output_itzi_file = Path(storage_conf.get('store_root')) / storage_conf.get('itzi_config_file')

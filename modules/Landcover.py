@@ -18,17 +18,17 @@ class Landcover:
         ----------
         """
 
-        dataset = gdal.Open(root_landcover_file, gdal.GA_ReadOnly) # Note GetRasterBand() takes band no. starting from 1 not 0
+        dataset = gdal.Open(root_landcover_file, gdal.GA_ReadOnly)
         proj = osr.SpatialReference(wkt = dataset.GetProjection())
         geotransform = dataset.GetGeoTransform()
-        band = dataset.GetRasterBand(1)
+        band = dataset.GetRasterBand(1) # Note GetRasterBand() takes band no. starting from 1 not 0
         arr = band.ReadAsArray()
 
         self._root = Path(root_landcover_file).resolve() # Resolve to remove relative paths
         self._arr = arr
         self._shape = arr.shape
         self._geotransform = geotransform
-        self._crs_code = int(proj.GetAttrValue('AUTHORITY',1)) # it returns a string consisting of the EPSG number
+        self._crs_code = int(proj.GetAttrValue('AUTHORITY',1)) # get the EPSG number as integer
         self._crs = f'EPSG:{self._crs_code}'
 
     def get_friction(self):
@@ -114,7 +114,8 @@ class Landcover:
         self._write_raster_file(output_file, new_arr)
 
 
-    def get_infiltration(self, imperviousness_file_path, rain_file_path, output_folder, infiltration_rate = True):
+    def get_infiltration(self, imperviousness_file_path, rain_file_path, output_folder,
+                         infiltration_rate=True):
         """Calculates friction at each pixel according to Landcover's file category.
 
         Args:
@@ -139,14 +140,14 @@ class Landcover:
 
         arr = self._arr
 
-        dataset = gdal.Open(imperviousness_file_path, gdal.GA_ReadOnly) # Note GetRasterBand() takes band no. starting from 1 not 0
+        dataset = gdal.Open(imperviousness_file_path, gdal.GA_ReadOnly)
         band = dataset.GetRasterBand(1)
         imperviousness_arr = band.ReadAsArray()
 
         infiltration_arr = np.zeros(self._shape)
 
-        # TODO: I wonder if this is faster than the previous double loop? Here we have ~18 numpy loops...
-        infiltration_arr[(arr >= 1) & (arr <= 7)] = np.clip(imperviousness_arr[(arr >= 1) & (arr <= 7)], 65, 95) / 100
+        # TODO: I wonder if this is faster than the previous double loop? Here's' ~18 numpy loops...
+        infiltration_arr[(arr >= 1) & (arr <= 7)] = np.clip(imperviousness_arr[(arr >= 1) & (arr <= 7)], 65, 95) / 100  # pylint: disable=line-too-long
         infiltration_arr[(arr >= 8) & (arr <= 10)] = 0.05
         infiltration_arr[arr==11] = np.clip(imperviousness_arr[arr==11], 65, 95) / 100
         infiltration_arr[(arr >= 12) & (arr <= 15)] = 0.2
@@ -169,7 +170,7 @@ class Landcover:
             rain_files = sorted(glob.glob(rain_file_path))
 
         for i, t in enumerate(rain_files):
-            rain_dataset = gdal.Open(t, gdal.GA_ReadOnly) # Note GetRasterBand() takes band no. starting from 1 not 0
+            rain_dataset = gdal.Open(t, gdal.GA_ReadOnly)
             rainband = rain_dataset.GetRasterBand(1)
             rain_arr = rainband.ReadAsArray()
 
@@ -190,7 +191,8 @@ class Landcover:
         Args:
             filename (str): Path to the output file
             array (numpy.array): Raster image to-be-written
-            dtype (gdal constant, optional): GDAL Data type for the file. Defaults to gdal.GDT_Float32.
+            dtype (gdal constant, optional): GDAL Data type for the file. Defaults to
+                                             gdal.GDT_Float32.
         """
         driver = gdal.GetDriverByName('GTiff')
 

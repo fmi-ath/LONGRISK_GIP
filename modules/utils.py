@@ -9,7 +9,6 @@ import rasterio
 from rasterio.warp import calculate_default_transform, reproject, Resampling
 from rasterio.mask import mask
 from rasterio.merge import merge
-from rasterio.windows import crop
 from shapely.geometry import Polygon
 import geopandas as gpd
 from fiona.crs import from_epsg
@@ -38,8 +37,9 @@ def _glob_path(search_path, search_criteria):
 
     return path
 
-def ascii_to_geotiff(ascii_files_path, GTiff_files_path, xmin, ymax, search_criteria = '*.txt', CRS_code = 3067,
-    xmax = None, xrotation = 0, xres = None, yrotation = 0, ymin = None, yres = None):
+def ascii_to_geotiff(ascii_files_path, GTiff_files_path, xmin, ymax, search_criteria='*.txt',
+                     CRS_code=3067, xmax=None, xrotation=0, xres=None, yrotation=0, ymin=None,
+                     yres=None):
 
     """A given ascii file(s) is(are) transformed into GeoTiff file.
 
@@ -106,7 +106,8 @@ def ascii_to_geotiff(ascii_files_path, GTiff_files_path, xmin, ymax, search_crit
         # Upper-left corner coordinates
         geotransform = (xmin, xres, xrotation, ymax, yrotation, -1 * yres)
 
-        GTiff_destination_file = os.path.join(GTiff_files_path, Path(filename).with_suffix('.tif').name)
+        GTiff_destination_file = os.path.join(GTiff_files_path,
+                                              Path(filename).with_suffix('.tif').name)
 
         output_raster = driver.Create(GTiff_destination_file, ncols, nrows, 1 ,gdal.GDT_Float32)
         output_raster.SetGeoTransform(geotransform)
@@ -178,7 +179,8 @@ def rain_relocation(GTiff_files_path, xmin, ymax, X_target, Y_target, X_radar_ra
 
     for filename in path:
 
-        dataset = gdal.Open(filename, gdal.GA_ReadOnly) # Note GetRasterBand() takes band no. starting from 1 not 0
+        # Note GetRasterBand() takes band no. starting from 1 not 0
+        dataset = gdal.Open(filename, gdal.GA_ReadOnly)
         # proj = osr.SpatialReference(wkt = dataset.GetProjection())
         geotransform = dataset.GetGeoTransform()
         band = dataset.GetRasterBand(1)
@@ -219,7 +221,8 @@ def rain_relocation(GTiff_files_path, xmin, ymax, X_target, Y_target, X_radar_ra
         # Upper-left corner coordinates
         geotransform = (Xmin, xres, xrotation, Ymax, yrotation, -1*yres)
 
-        GTiff_destination_file = os.path.join(GTiff_files_path, Path(filename).stem + '_relocated.tif')
+        GTiff_destination_file = os.path.join(GTiff_files_path,
+                                              f'{Path(filename).stem}_relocated.tif')
 
         output_raster = driver.Create(GTiff_destination_file, ncols, nrows, 1 ,gdal.GDT_Float32)
         output_raster.SetGeoTransform(geotransform)
@@ -259,6 +262,9 @@ def raster_check_projection(dst_fp, ref_fp = None, optional_crs = None):
     elif optional_crs is not None:
         m = f' and (reference CRS) {optional_crs}'
 
+    else: # ref_fp is None and optional_crs is None
+        raise ValueError('Indicate either a reference file or optional crs to compare projection')
+
     print(f'\nChecking projection consistency between: (source file) {Path(dst_fp).name} {m}')
 
     with rasterio.open(dst_fp) as src:
@@ -266,27 +272,26 @@ def raster_check_projection(dst_fp, ref_fp = None, optional_crs = None):
             with rasterio.open(ref_fp) as data:
                 if data.crs != src.crs:
                     reproj = True
-                    message = f'\n--> Files have different projection:\n\n  Reference CRS: {data.crs}\n  Source CRS: {src.crs}'
+                    message = (f'\n--> Files have different projection:\n\n  '
+                               f'Reference CRS: {data.crs}\n  Source CRS: {src.crs}')
 
-        elif (ref_fp is None) and (optional_crs is not None):
+        elif optional_crs is not None:
             if optional_crs != src.crs:
                 reproj = True
-                message = f'\n--> File has different projection to the one specified:\n\n   Reference CRS: {optional_crs}\n   Source CRS: {src.crs}'
-
-        else:
-            raise AttributeError('Indicate either a reference file or optional crs to compare projection')
+                message = (f'\n--> File has different projection to the one specified:\n\n   '
+                           f'Reference CRS: {optional_crs}\n   Source CRS: {src.crs}')
 
     print(message)
 
     return reproj
 
-def raster_reproject(dst_fp, reproj_fp=None, ref_fp=None, optional_crs=None, search_criteria='*.tif'):
+def raster_reproject(dst_fp, reproj_fp=None, ref_fp=None, optional_crs=None,
+                     search_criteria='*.tif'):
+    """ Reprojects a given raster or set of rasters with respect to a reference raster or
+    reference CRS.
 
-    """
     Based on:
     https://rasterio.readthedocs.io/en/latest/topics/reproject.html
-
-        Reprojects a given raster or set of rasters with respect to a reference raster or reference CRS.
 
         Parameters
         ----------
@@ -321,6 +326,13 @@ def raster_reproject(dst_fp, reproj_fp=None, ref_fp=None, optional_crs=None, sea
     for input_file in path:
         input_file = Path(input_file)
 
+        if reproj_fp is None:
+            output_fp = input_file.with_name(f'{input_file.stem}_reproj.tif')
+        elif Path(reproj_fp).suffix == '':
+            output_fp = os.path.join(reproj_fp, f'{input_file.stem}_reproj.tif')
+        else:
+            output_fp = reproj_fp
+
         with rasterio.open(input_file) as src:
 
             if ref_crs == src.crs:
@@ -338,15 +350,6 @@ def raster_reproject(dst_fp, reproj_fp=None, ref_fp=None, optional_crs=None, sea
                 'height': height
             })
 
-            if reproj_fp is not None:
-                if Path(reproj_fp).suffix == '':
-                    output_fp = os.path.join(reproj_fp, f'{input_file.stem}_reproj.tif')
-                else:
-                    output_fp = reproj_fp
-
-            else:
-                output_fp = input_file.with_name(f'{input_file.stem}_reproj.tif')
-
             with rasterio.open(output_fp, 'w', **kwargs) as dst:
                 for i in range(1, src.count + 1):
                     reproject(
@@ -360,12 +363,10 @@ def raster_reproject(dst_fp, reproj_fp=None, ref_fp=None, optional_crs=None, sea
                     )
 
 def raster_merge(rasters_folder_path, merged_file_path, search_criteria = "L*.tif"):
+    """ Merges a set of rasters into one raster.
 
-    """
     Based on:
     https://autogis-site.readthedocs.io/en/latest/notebooks/Raster/raster-mosaic.html
-
-        Merges a set of rasters into one raster.
 
         Parameters
         ----------
@@ -475,7 +476,8 @@ def raster_crop(raster_to_crop_path, cropped_file_path = None, search_criteria =
         geo = gpd.read_file(vector_file)
 
     elif (polygon_coords is not None) and (polygon_crs is not None):
-        geo = gpd.GeoDataFrame({'geometry': Polygon(polygon_coords)}, index=[0], crs=from_epsg(polygon_crs))
+        geo = gpd.GeoDataFrame({'geometry': Polygon(polygon_coords)}, index=[0],
+                               crs=from_epsg(polygon_crs))
 
     else:
         raise ValueError('Vector or Polygon needed for cropping')
@@ -611,8 +613,8 @@ def _load_gdal_raster(filename):
 
     return (data, metadata)
 
-def set_raster_resolution(input_file, reference_file, output_file = None, binary = False, mask_value = None):
-
+def set_raster_resolution(input_file, reference_file, output_file=None, binary=False,
+                          mask_value=None):
     """Checks the size and resolution of a given raster with respect to a reference raster.
 
         Parameters
@@ -624,7 +626,8 @@ def set_raster_resolution(input_file, reference_file, output_file = None, binary
         binary : bool
             Boolean indicating if data in the input file are binary or continuous
         mask_value : float
-            Float indicating if there is a value that should not be taking into account when averaging or expanding
+            Float indicating if there is a value that should not be taking into account when
+            averaging or expanding
 
 
         Returns
