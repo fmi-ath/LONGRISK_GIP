@@ -76,6 +76,18 @@ def ascii_to_geotiff(ascii_files_path, GTiff_files_path, xmin, ymax, search_crit
         out : file
             GTiff converted file
     """
+    if xres is None and xmax is None:
+        raise ValueError("If 'xres' not given, 'xmax' has to be given")
+
+    if yres is None and ymax is None:
+        raise ValueError("If 'yres' not given, 'ymin' has to be given")
+
+    # GDAL setup
+    driver = gdal.GetDriverByName('GTiff')
+    srs = osr.SpatialReference()
+    srs.ImportFromEPSG(CRS_code)
+    projection_wkt = srs.ExportToWkt()
+
     path = _glob_path(ascii_files_path, search_criteria)
 
     for filename in path:
@@ -84,36 +96,22 @@ def ascii_to_geotiff(ascii_files_path, GTiff_files_path, xmin, ymax, search_crit
 
         nrows, ncols = np.shape(array)
 
-        if (xres is None) and (xmax is not None):
-
+        # Note: xres and yres are calculated only once as both are not None after first loop
+        if xres is None:
             xres = (xmax - xmin) / float(ncols)
 
-        elif (xres is None) and (xmax is None):
-
-            raise AttributeError('If xres not given, xmax has to be given')
-
-        if (yres is None) and (ymin is not None):
-
+        if yres is None:
             yres = (ymax - ymin) / float(nrows)
-
-        elif (yres is None) and (ymin is None):
-
-            raise AttributeError('If yres not given, ymin has to be given')
 
         # Upper-left corner coordinates
         geotransform = (xmin, xres, xrotation, ymax, yrotation, -1 * yres)
 
         GTiff_destination_file = os.path.join(GTiff_files_path, Path(filename).with_suffix('.tif').name)
 
-        output_raster = gdal.GetDriverByName('GTiff').Create(GTiff_destination_file, ncols, nrows, 1 ,gdal.GDT_Float32)  # Open the file
-        output_raster.SetGeoTransform(geotransform)  # Specify its coordinates
-        srs = osr.SpatialReference()                 # Establish its coordinate encoding
-        srs.ImportFromEPSG(CRS_code)                     # This one specifies WGS84 lat long.
-                                                     # Anyone know how to specify the
-                                                     # IAU2000:49900 Mars encoding?
-        output_raster.SetProjection( srs.ExportToWkt() )   # Exports the coordinate system
-                                                           # to the file
-        output_raster.GetRasterBand(1).WriteArray(array)   # Writes my array to the raster
+        output_raster = driver.Create(GTiff_destination_file, ncols, nrows, 1 ,gdal.GDT_Float32)
+        output_raster.SetGeoTransform(geotransform)
+        output_raster.SetProjection(projection_wkt)
+        output_raster.GetRasterBand(1).WriteArray(array)
 
         output_raster.FlushCache()
         output_raster = None
@@ -165,6 +163,17 @@ def rain_relocation(GTiff_files_path, xmin, ymax, X_target, Y_target, X_radar_ra
         out : file
             GTiff relocated file
     """
+    if xres is None and xmax is None:
+        raise ValueError('If xres not given, xmax has to be given')
+    if yres is None and ymin is None:
+        raise ValueError('If yres not given, ymin has to be given')
+
+    # GDAL setup
+    driver = gdal.GetDriverByName('GTiff')
+    srs = osr.SpatialReference()
+    srs.ImportFromEPSG(CRS_code)
+    projection_wkt = srs.ExportToWkt()
+
     path = _glob_path(GTiff_files_path, search_criteria)
 
     for filename in path:
@@ -175,23 +184,17 @@ def rain_relocation(GTiff_files_path, xmin, ymax, X_target, Y_target, X_radar_ra
         band = dataset.GetRasterBand(1)
         array = band.ReadAsArray()
 
+        # Close opened file
+        band = None
+        dataset = None
+
         nrows, ncols = np.shape(array)
 
-        if (xres is None) and (xmax is not None):
-
+        if xres is None:
             xres = (xmax - xmin) / float(ncols)
 
-        elif (xres is None) and (xmax is None):
-
-            raise AttributeError('If xres not given, xmax has to be given')
-
-        if (yres is None) and (ymin is not None):
-
+        if yres is None:
             yres = (ymax - ymin) / float(nrows)
-
-        elif (yres is None) and (ymin is None):
-
-            raise AttributeError('If yres not given, ymin has to be given')
 
         X = xmin
         Y = ymax
@@ -218,19 +221,14 @@ def rain_relocation(GTiff_files_path, xmin, ymax, X_target, Y_target, X_radar_ra
 
         GTiff_destination_file = os.path.join(GTiff_files_path, Path(filename).stem + '_relocated.tif')
 
-        output_raster = gdal.GetDriverByName('GTiff').Create(GTiff_destination_file, ncols, nrows, 1 ,gdal.GDT_Float32)  # Open the file
-        output_raster.SetGeoTransform(geotransform)  # Specify its coordinates
-        srs = osr.SpatialReference()                 # Establish its coordinate encoding
-        srs.ImportFromEPSG(CRS_code)                     # This one specifies WGS84 lat long.
-                                                     # Anyone know how to specify the
-                                                     # IAU2000:49900 Mars encoding?
-        output_raster.SetProjection( srs.ExportToWkt() )   # Exports the coordinate system
-                                                           # to the file
-        output_raster.GetRasterBand(1).WriteArray(array)   # Writes my array to the raster
+        output_raster = driver.Create(GTiff_destination_file, ncols, nrows, 1 ,gdal.GDT_Float32)
+        output_raster.SetGeoTransform(geotransform)
+        output_raster.SetProjection(projection_wkt)
+        output_raster.GetRasterBand(1).WriteArray(array)
 
         output_raster.FlushCache()
+        output_raster = None
 
-    return
 
 def raster_check_projection(dst_fp, ref_fp = None, optional_crs = None):
 
@@ -316,7 +314,7 @@ def raster_reproject(dst_fp, reproj_fp=None, ref_fp=None, optional_crs=None, sea
     elif optional_crs is not None:
         ref_crs = optional_crs
     else:
-        raise AttributeError('Indicate either a reference file or optional crs reproject')
+        raise ValueError('Indicate either a reference file or optional crs reproject')
 
     path = _glob_path(dst_fp, search_criteria)
 
@@ -413,14 +411,13 @@ def raster_merge(rasters_folder_path, merged_file_path, search_criteria = "L*.ti
     #print(src.meta['crs'])
 
     # Update the metadata
-    out_meta.update({"driver": "GTiff",
-                     "height": mosaic.shape[1],
-                     "width": mosaic.shape[2],
-                     "transform": out_trans,
-                     #"crs": "+proj=utm +zone=35 +ellps=GRS80 +units=m +no_defs "
-                     "crs": src.meta['crs']
-                     }
-                    )
+    out_meta.update({
+        "driver": "GTiff",
+        "height": mosaic.shape[1],
+        "width": mosaic.shape[2],
+        "transform": out_trans,
+        "crs": src.meta['crs']
+    })
 
     # Write the mosaic raster to disk
     with rasterio.open(out_fp, "w", **out_meta) as dest:
@@ -439,11 +436,10 @@ def raster_crop(raster_to_crop_path, cropped_file_path = None, search_criteria =
                 vector_file = None, polygon_coords = None, polygon_crs = None, mask_value = -9999.,
                 mask_all_touched = False):
 
-    """
+    """Crop a raster or set of rasters according to shapefile or Polygon.
+
     Based on:
     https://autogis-site.readthedocs.io/en/latest/notebooks/Raster/clipping-raster.html?highlight=crop
-
-        Crops a raster or set of rasters according to shapefile or Polygon.
 
         Parameters
         ----------
@@ -482,7 +478,7 @@ def raster_crop(raster_to_crop_path, cropped_file_path = None, search_criteria =
         geo = gpd.GeoDataFrame({'geometry': Polygon(polygon_coords)}, index=[0], crs=from_epsg(polygon_crs))
 
     else:
-        raise AttributeError('Vector or Polygon needed for cropping')
+        raise ValueError('Vector or Polygon needed for cropping')
 
     path = _glob_path(raster_to_crop_path, search_criteria)
 
@@ -536,23 +532,16 @@ def raster_crop(raster_to_crop_path, cropped_file_path = None, search_criteria =
             dest.write(out_img)
 
 def vector_reproject(input_vector_file, reference_vector_file, output_file):
+    """Reproject a given vector or set of vectors with respect to a reference vector file.
 
-    """Reprojects a given vector or set of vetor with respect to a reference vector file.
-
-        Parameters
-        ----------
-        input_vector_file : str
-            Path of the vector file to reproject.
-        reference_vector_file : str
-            Path of the reference vector file.
-        output_file : str
-            Path of the new vector file reprojected.
-
-
-        Returns
-        -------
-        out : file
-            Reprojected file
+    Parameters
+    ----------
+    input_vector_file : str | Path
+        Path of the vector file to reproject.
+    reference_vector_file : str | Path
+        Path of the reference vector file.
+    output_file : str | Path
+        Path of the new vector file reprojected.
     """
 
     geo1 = gpd.read_file(input_vector_file)
@@ -590,13 +579,9 @@ def vector_intersection(vector_file_1, vector_file_2, output_file):
     geo1 = gpd.read_file(vector_file_1)
     geo2 = gpd.read_file(vector_file_2)
 
-    try:
-
-        assert geo2.crs == geo1.crs
-
-    except AssertionError:
-
-        reproj_file = os.path.join(os.path.split(vector_file_2)[0], os.path.splitext(os.path.split(vector_file_2)[1])[0] + '_reproj.shp')
+    if geo2.crs != geo1.crs:
+        vector_file_2 = Path(vector_file_2)
+        reproj_file = vector_file_2.with_name(f"{vector_file_2.stem}_reproj.shp")
 
         vector_reproject(vector_file_2, vector_file_1, reproj_file)
 
@@ -606,6 +591,25 @@ def vector_intersection(vector_file_1, vector_file_2, output_file):
 
     intersection.to_file(output_file)
 
+
+def _load_gdal_raster(filename):
+    dataset = gdal.Open(filename, gdal.GA_ReadOnly)
+    band = dataset.GetRasterBand(1)
+
+    srs = osr.SpatialReference(wkt=dataset.GetProjection())
+    geotransform = dataset.GetGeoTransform()
+
+    data = band.ReadAsArray()
+
+    band = None
+    dataset = None
+
+    metadata = {
+        'srs': srs,
+        'geotransform': geotransform,
+    }
+
+    return (data, metadata)
 
 def set_raster_resolution(input_file, reference_file, output_file = None, binary = False, mask_value = None):
 
@@ -629,38 +633,18 @@ def set_raster_resolution(input_file, reference_file, output_file = None, binary
             File with same path as input file but resolution changed according to reference file
     """
 
-    dataset = gdal.Open(reference_file, gdal.GA_ReadOnly) # Note GetRasterBand() takes band no. starting from 1 not 0
-    proj = osr.SpatialReference(wkt = dataset.GetProjection())
-    ref_geotransform = dataset.GetGeoTransform()
-    band = dataset.GetRasterBand(1)
-    ref_array = band.ReadAsArray()
+    in_array, _ = _load_gdal_raster(input_file)
+    ref_array, ref_meta = _load_gdal_raster(reference_file)
 
-    CRS_code = int(proj.GetAttrValue('AUTHORITY',1))
+    if in_array.shape == ref_array.shape:
+        return
 
-    ref_shape = np.shape(ref_array)
-
-    ref_rows, ref_cols = ref_shape
-    band = None
-    dataset = None
-
-    dataset = gdal.Open(input_file, gdal.GA_ReadOnly) # Note GetRasterBand() takes band no. starting from 1 not 0
-    proj = osr.SpatialReference(wkt = dataset.GetProjection())
-    # geotransform = dataset.GetGeoTransform()
-    band = dataset.GetRasterBand(1)
-    in_array = band.ReadAsArray()
-
-    in_shape = np.shape(in_array)
-
-    in_rows, in_cols = in_shape
-
-    band = None
-    dataset = None
+    ref_rows, ref_cols = ref_array.shape
+    in_rows, in_cols = in_array.shape
 
     new_array = np.empty((in_rows, in_cols))
 
-    if in_shape == ref_shape:
-        return
-
+    # Process raster heights
     if in_rows > ref_rows:
 
         ratio = floor(in_rows / ref_rows)
@@ -709,6 +693,7 @@ def set_raster_resolution(input_file, reference_file, output_file = None, binary
 
             j = i * ratio
 
+    # Process raster widths
     if in_cols > ref_cols:
 
         ratio = floor(in_cols / ref_cols)
@@ -763,22 +748,26 @@ def set_raster_resolution(input_file, reference_file, output_file = None, binary
 
             j = i * ratio
 
-    new_array_2 = np.empty(ref_shape)
+    new_array_2 = np.empty(ref_array.shape)
     new_array_2 = new_array[0:ref_rows, 0:ref_cols]
 
     if output_file is None:
 
         output_file = input_file
 
-    output_raster = gdal.GetDriverByName('GTiff').Create(output_file, ref_cols, ref_rows, 1 ,gdal.GDT_Float32)  # Open the file
-    output_raster.SetGeoTransform(ref_geotransform)  # Specify its coordinates
-    srs = osr.SpatialReference()                 # Establish its coordinate encoding
-    srs.ImportFromEPSG(CRS_code)                     # This one specifies WGS84 lat long.
-                                                 # Anyone know how to specify the
-                                                 # IAU2000:49900 Mars encoding?
-    output_raster.SetProjection( srs.ExportToWkt() )   # Exports the coordinate system
-                                                       # to the file
-    output_raster.GetRasterBand(1).WriteArray(new_array_2)   # Writes my array to the raster
+    # Write modified raster to file
+    ref_proj = ref_meta.get('srs')
+    ref_geotransform = ref_meta.get('geotransform')
+    CRS_code = int(ref_proj.GetAttrValue('AUTHORITY',1))
+
+    srs = osr.SpatialReference()
+    srs.ImportFromEPSG(CRS_code)
+
+    driver = gdal.GetDriverByName('GTiff')
+    output_raster = driver.Create(output_file, ref_cols, ref_rows, 1 ,gdal.GDT_Float32)
+    output_raster.SetGeoTransform(ref_geotransform)
+    output_raster.SetProjection( srs.ExportToWkt() )
+    output_raster.GetRasterBand(1).WriteArray(new_array_2)
 
     output_raster.FlushCache()
     output_raster = None

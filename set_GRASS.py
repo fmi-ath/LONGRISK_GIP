@@ -1,7 +1,8 @@
 import os
 import sys
+import subprocess
 from configparser import ConfigParser
-from subprocess import call
+from pathlib import Path
 
 # pylint: disable=import-error
 import modules.GRASS_utils as grutl
@@ -26,6 +27,14 @@ config = ConfigParser()
 
 # parse existing file
 config.read(ini_config_file)
+grass_info = config['grass_info']
+grass_time = config['grass_time']
+grass_input = config['grass_input']
+grass_output = config['grass_output']
+grass_statistics = config['grass_statistics']
+grass_options = config['grass_options']
+storage_conf = config['storage']
+
 
 #* ---
 #* 1. We define the paths in which we would like to work out the simulation
@@ -37,16 +46,15 @@ config.read(ini_config_file)
 #*    not exists, it creates it. If it exists, it opens it and load the files
 #* ---
 
-mygisdb = config.get('grass_info', 'mygisdb')
-mylocation = config.get('grass_info', 'mylocation')
-mymapset = config.get('grass_info', 'mymapset')
-CRS = config.get('grass_info', 'CRS')
+mygisdb = grass_info.get('mygisdb', 'GRASS_itzi/grassdata')
+mylocation = grass_info.get('mylocation')
+mymapset = grass_info.get('mymapset')
+CRS = grass_info.get('CRS')
 
-mapset_path = os.path.join(mygisdb, mylocation, mymapset)
+mapset_path = Path(os.path.join(mygisdb, mylocation, mymapset))
 
 if os.path.exists(mapset_path):
-
-    call(["rm", "-r", mapset_path])
+    subprocess.call(["rm", "-r", mapset_path])
 
 user = grutl.initiate_GRASS_sesion(mygisdb, mylocation, mymapset, CRS_code = CRS)
 
@@ -57,17 +65,17 @@ user = grutl.initiate_GRASS_sesion(mygisdb, mylocation, mymapset, CRS_code = CRS
 #*    output = Helsinki_cropped)
 #* ---
 
-rasters_path = 'GRASS_itzi/grassdata'
+rasters_path = Path(mygisdb)
 
 g.list(flags = 'p', type = 'raster')
 
 grutl.import_multiple_raster_files(rasters_path, search_criteria = '*.tif')
 
 # Set the region to match the raster of interest
-g.region(raster = 'DEM_cropped' + '@' + mymapset)
+g.region(raster = f'DEM_cropped@{mymapset}')
 
 # We would like to mask data that falls outside the boundaries for the simulation
-r.mask(raster = 'DEM_cropped' + '@' + mymapset)
+r.mask(raster = f'DEM_cropped@{mymapset}')
 
 # If you would like to check the imported files
 g.list(flags = 'p', type = 'raster')
@@ -84,7 +92,7 @@ t.create(output = stds, semantictype = 'mean', title = 'Rain Rate', description 
 #* 6. Import the minutely recorded radar rain events.
 #* ---
 
-rain_path = 'GRASS_itzi/grassdata/rain'
+rain_path = rasters_path / 'rain'
 
 grutl.import_multiple_raster_files(rain_path, search_criteria = '*.tif')
 
@@ -96,15 +104,16 @@ g.list(flags = 'p', type = 'raster')
 #*    .txt file indicating the name of the files, we will first create the file and then register.
 #* ---
 
-rain_txt_file = 'GRASS_itzi/grassdata/rain/rain_registering_data.txt'
-start_time = config.get('grass_time', 'start_time')
-increment_number = config.getint('grass_time', 'increment_number')
-increment_unit = config.get('grass_time', 'increment_unit')
+rain_txt_file = rain_path / 'rain_registering_data.txt'
+
+start_time = grass_time.get('start_time')
+increment_number = int(grass_time.get('increment_number'))
+increment_unit = grass_time.get('increment_unit')
 
 grutl.create_rain_raster_text_file(rain_path, rain_txt_file, search_criteria = '*.tif', start_time = start_time,
                                     increment_number = increment_number, increment_unit = increment_unit)
 
-t.register(type = 'raster', input = stds, file = rain_txt_file)
+t.register(type = 'raster', input = stds, file = str(rain_txt_file))
 
 #* ---
 #* 8. We now create the izti configuration file to run the simulation. Here we set all the parameters we need
@@ -112,46 +121,47 @@ t.register(type = 'raster', input = stds, file = rain_txt_file)
 #*    must be strings
 #* ---
 
-output_itzi_file = 'GRASS_itzi/itzi_config_file.ini'
-grass_bin_path = config.get('grass_info', 'grass_bin_path')
+output_itzi_file = Path(storage_conf.get('store_root')) / storage_conf.get('itzi_config_file')
+grass_bin_path = grass_info.get('grass_bin_path')
 grassdata_path = mygisdb
 location = mylocation
 mapset = mymapset
-end_time = config.get('grass_time', 'end_time')
-record_step = config.get('grass_time', 'record_step')
-duration = config.get('grass_time', 'duration')
-dem = config.get('grass_input', 'dem')
-dem = dem or 'DEM_cropped'
-friction = config.get('grass_input', 'friction')
-friction = friction or 'friction'
+end_time = grass_time.get('end_time')
+record_step = grass_time.get('record_step')
+duration = grass_time.get('duration')
+dem = grass_input.get('dem') or 'DEM_cropped'
+friction = grass_input.get('friction') or 'friction'
 rain = stds
-start_h = config.get('grass_input', 'start_h')
-start_y = config.get('grass_input', 'start_y')
-inflow = config.get('grass_input', 'inflow')
-bctype = config.get('grass_input', 'bctype')
-bcval = config.get('grass_input', 'bcval')
-infiltration = config.get('grass_input', 'infiltration')
+start_h = grass_input.get('start_h', '')
+start_y = grass_input.get('start_y', '')
+inflow = grass_input.get('inflow', '')
+bctype = grass_input.get('bctype', '')
+bcval = grass_input.get('bcval', '')
+infiltration = grass_input.get('infiltration')
 if not infiltration:
 
     if config.getboolean('rain', 'infiltration_rate'):
 
         inf_stds = 'infiltration_minutely'
 
-        t.create(output = inf_stds, semantictype = 'mean', title = 'Infiltration Rate', description = 'Infiltration rate data for itzi')
+        t.create(output=inf_stds, semantictype='mean', title='Infiltration Rate',
+                 description='Infiltration rate data for itzi')
 
-        infiltration_path = 'GRASS_itzi/grassdata/infiltration'
+        infiltration_path = rasters_path / 'infiltration'
 
         grutl.import_multiple_raster_files(infiltration_path, search_criteria = '*.tif')
 
-        infiltration_txt_file = 'GRASS_itzi/grassdata/infiltration/infiltration_registering_data.txt'
-        start_time = config.get('grass_time', 'start_time')
-        increment_number = config.getint('grass_time', 'increment_number')
-        increment_unit = config.get('grass_time', 'increment_unit')
+        infiltration_txt_file = infiltration_path / 'infiltration_registering_data.txt'
+        start_time = grass_time.get('start_time')
+        increment_number = int(grass_time.get('increment_number'))
+        increment_unit = grass_time.get('increment_unit')
 
-        grutl.create_rain_raster_text_file(infiltration_path, infiltration_txt_file, search_criteria = '*.tif', start_time = start_time,
-                                            increment_number = increment_number, increment_unit = increment_unit)
+        grutl.create_rain_raster_text_file(infiltration_path, infiltration_txt_file,
+                                           search_criteria='*.tif', start_time=start_time,
+                                           increment_number=increment_number,
+                                           increment_unit=increment_unit)
 
-        t.register(type = 'raster', input = inf_stds, file = infiltration_txt_file)
+        t.register(type = 'raster', input = inf_stds, file = str(infiltration_txt_file))
 
         infiltration = inf_stds
 
@@ -159,31 +169,30 @@ if not infiltration:
 
         infiltration = 'infiltration_0'
 
-losses = config.get('grass_input', 'losses')
-losses =  losses or 'losses'
+losses = grass_input.get('losses') or 'losses'
 
-prefix = config.get('grass_output', 'prefix')
-prefix = prefix or f'{mymapset}_itzi'
+prefix = grass_output.get('prefix') or f'{mymapset}_itzi'
 
-values = config.get('grass_output', 'values')
+values = grass_output.get('values')
 
-stats_file = config.get('grass_statistics', 'stats_file')
-stats_file = stats_file or f'GRASS_itzi/{mymapset}_itzi.csv'
+stats_file = grass_statistics.get('stats_file') or f'GRASS_itzi/{mymapset}_itzi.csv'
 
-hmin = config.get('grass_options', 'hmin')
-slmax = config.get('grass_options', 'slmax')
-cfl = config.get('grass_options', 'cfl')
-theta = config.get('grass_options', 'theta')
-vrouting = config.get('grass_options', 'vrouting')
-dtmax = config.get('grass_options', 'dtmax')
-dtinf = config.get('grass_options', 'dtinf')
+hmin = grass_options.get('hmin')
+slmax = grass_options.get('slmax')
+cfl = grass_options.get('cfl')
+theta = grass_options.get('theta')
+vrouting = grass_options.get('vrouting')
+dtmax = grass_options.get('dtmax')
+dtinf = grass_options.get('dtinf')
 
-grutl.create_itzi_config_file(output_itzi_file, grass_bin = grass_bin_path, grassdata = grassdata_path, location = location, mapset = mapset,
-                            start_time = start_time, end_time = end_time, duration = duration, record_step = record_step, dem = dem, friction = friction,
-                            start_h = start_h, start_y = start_y, rain = rain, inflow = inflow, bctype = bctype,
-                            bcval = bcval, infiltration = infiltration, losses = losses, prefix = prefix, values = values,
-                            stats_file = stats_file, hmin = hmin, slmax = slmax, cfl = cfl, theta = theta, vrouting = vrouting,
-                            dtmax = dtmax, dtinf = dtinf)
+grutl.create_itzi_config_file(output_itzi_file, record_step=record_step, dem=dem, friction=friction,
+                              grass_bin=grass_bin_path, grassdata=grassdata_path,
+                              location=location, mapset=mapset, start_time=start_time,
+                              end_time=end_time, duration=duration, start_h=start_h,start_y=start_y,
+                              rain=rain, inflow=inflow, bctype=bctype, bcval=bcval,
+                              infiltration=infiltration, losses=losses, prefix=prefix,
+                              values=values, stats_file=stats_file, hmin=hmin, slmax=slmax, cfl=cfl,
+                              theta=theta, vrouting=vrouting, dtmax=dtmax, dtinf=dtinf)
 
 #* ---
 #* 9. End the current grass session

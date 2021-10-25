@@ -4,9 +4,7 @@ import os
 import glob
 from pathlib import Path
 from datetime import datetime, timedelta
-from re import sub
 
-import numpy as np
 from grass_session import Session
 from grass.script import core as gcore
 import grass.script as gscript
@@ -54,20 +52,10 @@ def initiate_GRASS_sesion(mygisdb, mylocation, mymapset, CRS_code = 4326):
     return user
 
 def end_GRASS_sesion(session_name):
-
-    """Ends the current GRASS session.
-
-        Parameters
-        ----------
-        mymapset : str
-            Name of the mapset for the current session.
-    """
-
+    """Ends the current GRASS session."""
     session_name.close()
 
-    return
-
-def check_remove_existing_files(mapset, search_criteria = '*', maps_remove = True, datasets_remove = True):
+def check_remove_existing_files(maps_remove = True, datasets_remove = True):
 
     """
     Based on:
@@ -77,10 +65,6 @@ def check_remove_existing_files(mapset, search_criteria = '*', maps_remove = Tru
 
         Parameters
         ----------
-        mapset : str
-            Name of the mapset for the current session.
-        search_criteria : list or str
-            List of criteria for searhing the maps or datasets to be removed.
         maps_remove: bool
             Boolean indicating if maps (if any) are to be removed
         datasets_remove: bool
@@ -191,7 +175,6 @@ def create_rain_raster_text_file(rain_raster_path, output_file, search_criteria 
 
     f.close()
 
-    return
 
 def create_itzi_config_file(output_file, record_step=None, dem=None, friction=None,
                             # input

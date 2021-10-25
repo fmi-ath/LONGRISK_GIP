@@ -22,8 +22,9 @@ config = ConfigParser()
 config.read(ini_config_file)
 
 # Path setup
-temp_folder = Path(config.get('storage', 'temp_folder', fallback='GRASS_itzi/temp'))
-grassdata_folder = Path(config.get('storage', 'grassdata_folder', fallback='GRASS_itzi/grassdata'))
+store_root = Path(config.get('storage', 'store_root', fallback='GRASS_itzi'))
+temp_folder = store_root / config.get('storage', 'temp_folder', fallback='temp')
+grassdata_folder = store_root / config.get('storage', 'grassdata_folder', fallback='grassdata')
 
 #* ---
 #* Cropping utilities
@@ -192,8 +193,8 @@ if config.get('rain', 'rain_relocation'):
 reference_file_path = os.path.join(grassdata_folder, 'DEM_cropped.tif')
 
 if Path(GTiff_files_path).suffix == '':
-
-    reproj = utl.raster_check_projection(glob.glob(GTiff_files_path + '/*.tif')[0], ref_fp = reference_file_path)
+    source_fname = next(glob.iglob(f"{GTiff_files_path}/*.tif"))  # Use glob iterator as we need only one file
+    reproj = utl.raster_check_projection(source_fname, ref_fp = reference_file_path)
 
 else:
 
