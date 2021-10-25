@@ -35,6 +35,23 @@ grass_statistics = config['grass_statistics']
 grass_options = config['grass_options']
 storage_conf = config['storage']
 
+#* Create a rc file for grass if it doesn't exist yet
+# If GISRC is set, assume valid path. Else default to grass's default: $HOME/.grass7/rc
+gisrc = os.environ.get('GISRC', None)
+if gisrc is None or not gisrc:
+    raise RuntimeError('Environment variable GISRC is not set! Cannot run grass.')
+
+gisrc = Path(gisrc).expanduser().resolve()
+
+if not gisrc.exists():
+    print(f'GISRC file {gisrc} does not exist! Creating one based on {ini_config_file}:')
+    rcstr = (f"GISDBASE: {grass_info.get('mygisdb')}\n"
+             f"LOCATION_NAME: {grass_info.get('mylocation')}\n"
+             f"MAPSET: {grass_info.get('mymapset')}\n"
+             "GUI: text\n")
+    print(f'\n{rcstr}')
+    with open(gisrc, 'w', encoding='utf-8') as f:
+        f.write(rcstr)
 
 #* ---
 #* 1. We define the paths in which we would like to work out the simulation
