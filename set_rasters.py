@@ -7,7 +7,7 @@ from pathlib import Path
 import rasterio as rio
 
 import modules.Landcover as LC
-import modules.utils as utl
+import modules.raster_utils as utl
 
 #* ---
 #* We read the input information from the ini file and then the magic happens
