@@ -3,9 +3,9 @@
 name="longrisk-gip"
 srcbindpoint=/usr/src/app/
 databindpoint=/data/
-datafolder=${PWD%/*}/data
+datafolder=$HOME/data/longrisk/
 # Limit container's resource usage
-cpus='10'
+cpus='12.5'
 memory='32g'
 memory_swap='33g' # True swap amount is memory_swap - memory.
 
@@ -17,6 +17,7 @@ docker run -it --rm \
     --memory-swap=$memory_swap \
     --volume ${PWD}:$srcbindpoint \
     --volume $datafolder:$databindpoint:ro \
+    --volume $HOME/data/storage/tmp/longrisk/:/tmp/gip/ \
     --env HOME=$srcbindpoint \
     --env LOGNAME=$LOGNAME \
     --env GISRC=$srcbindpoint/.grass7/rc \
@@ -27,4 +28,4 @@ docker run -it --rm \
 #     --volume /your/test/grassdata/:/data --env HOME=/data/ grassgis80 \
 #         grass /data/nc_basic_spm_grass7/PERMANENT --exec g.region -p
 
-unset name srcbindpoint databindpoint datafolder
+unset name srcbindpoint databindpoint datafolder cpus memory_swap memory
