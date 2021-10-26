@@ -41,59 +41,31 @@ class Landcover:
 
         new_arr = np.zeros(self._shape)
 
-        # TODO: See if this double-loop can be rewritten using np.nditer function or indexing tricks
-        for i in range(self._shape[0]):
+        singles = (
+            (14, 0.04),
+            (15, 0.08),
+            (16, 0.03),
+        )
 
-            for j in range(self._shape[1]):
+        ranges = (
+            (1, 4, 0.08),
+            (5, 7, 0.02),
+            (8, 9, 0.05),
+            (10, 13, 0.08),
+            (17, 21, 0.04),
+            (22, 29, 0.1),
+            (30, 31, 0.04),
+            (32, 36, 0.05),
+            (37, 39, 0.04),
+            (40, 45, 0.06),
+            (46, 48, 0.03),
+        )
 
-                element = arr[i, j]
+        for value, new_value in singles:
+            new_arr[arr == value] = new_value
 
-                if 1 <= element <= 4:
-                    friction_value = 0.08
-
-                elif 5 <= element <= 7:
-                    friction_value = 0.02
-
-                elif 8 <= element <= 9:
-                    friction_value = 0.05
-
-                elif 10 <= element <= 13:
-                    friction_value = 0.08
-
-                elif element == 14:
-                    friction_value = 0.04
-
-                elif element == 15:
-                    friction_value = 0.08
-
-                elif element == 16:
-                    friction_value = 0.03
-
-                elif 17 <= element <= 21:
-                    friction_value = 0.04
-
-                elif 22 <= element <= 29:
-                    friction_value = 0.1
-
-                elif 30 <= element <= 31:
-                    friction_value = 0.04
-
-                elif 32 <= element <= 36:
-                    friction_value = 0.05
-
-                elif 37 <= element <= 39:
-                    friction_value = 0.04
-
-                elif 40 <= element <= 45:
-                    friction_value = 0.06
-
-                elif 46 <= element <= 48:
-                    friction_value = 0.03
-
-                else:
-                    continue  # Skip unknown values
-
-                new_arr[i, j] = friction_value
+        for start, stop, value in ranges:
+            new_arr[(arr >= start) & (arr <= stop)] = value
 
         #geotransform = dataset.GetGeoTransform()
         output_file = os.path.join(self._root.parent, 'friction.tif')
@@ -141,12 +113,12 @@ class Landcover:
         arr = self._arr
 
         dataset = gdal.Open(imperviousness_file_path, gdal.GA_ReadOnly)
-        band = dataset.GetRasterBand(1)
-        imperviousness_arr = band.ReadAsArray()
+        imperviousness_arr = dataset.GetRasterBand(1).ReadAsArray()
+        dataset = None
 
         infiltration_arr = np.zeros(self._shape)
 
-        # TODO: I wonder if this is faster than the previous double loop? Here's' ~18 numpy loops...
+        # This is about two orders of magnitude faster than the previous double loop
         infiltration_arr[(arr >= 1) & (arr <= 7)] = np.clip(imperviousness_arr[(arr >= 1) & (arr <= 7)], 65, 95) / 100  # pylint: disable=line-too-long
         infiltration_arr[(arr >= 8) & (arr <= 10)] = 0.05
         infiltration_arr[arr==11] = np.clip(imperviousness_arr[arr==11], 65, 95) / 100
@@ -154,13 +126,14 @@ class Landcover:
         infiltration_arr[(arr >= 16) & (arr <= 20)] = 0.2
         infiltration_arr[(arr >= 21) & (arr <= 36)] = 0.1
         infiltration_arr[(arr >= 37) & (arr <= 45)] = 0.05
-        infiltration_arr[(arr >= 46) & (arr <= 48)] = 0.05
+        infiltration_arr[(arr >= 46) & (arr <= 48)] = 1
 
         infiltration_arr = 1 - infiltration_arr # Infiltration coefficients from runoff coefficients
+        infiltration_arr = np.round(infiltration_arr, 2)  # Round for prettier output
 
         if not infiltration_rate:
-            output_file = os.path.join(output_folder, 'infiltration.tif')
-            self._write_raster_file(output_file, infiltration_arr)
+            self._write_raster_file(filename=os.path.join(output_folder, 'infiltration.tif'),
+                                    array=infiltration_arr)
 
             return
 
@@ -171,8 +144,8 @@ class Landcover:
 
         for i, t in enumerate(rain_files):
             rain_dataset = gdal.Open(t, gdal.GA_ReadOnly)
-            rainband = rain_dataset.GetRasterBand(1)
-            rain_arr = rainband.ReadAsArray()
+            rain_arr = rain_dataset.GetRasterBand(1).ReadAsArray()
+            rain_dataset = None
 
             av_rain = np.mean(rain_arr[rain_arr >= 0])
 
