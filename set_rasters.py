@@ -8,23 +8,22 @@ import rasterio as rio
 
 import modules.Landcover as LC
 import modules.raster_utils as utl
+from modules import common
 
 #* ---
 #* We read the input information from the ini file and then the magic happens
 #* ---
 
-ini_config_file = sys.argv[1]
-
 # instantiate
-config = ConfigParser()
-
-# parse existing file
-config.read(ini_config_file)
+config = common.CONFIG
 
 # Path setup
-store_root = Path(config.get('storage', 'store_root', fallback='GRASS_itzi'))
-temp_folder = store_root / config.get('storage', 'temp_folder', fallback='temp')
-grassdata_folder = store_root / config.get('storage', 'grassdata_folder', fallback='grassdata')
+temp_folder = common.get_path_for('temporary')
+grassdata_folder = common.get_path_for('mygisdb')
+
+print('Checking that output folders exist...', end=' ')
+common.ensure_folders_exist()
+print('Done.')
 
 #* ---
 #* Cropping utilities
