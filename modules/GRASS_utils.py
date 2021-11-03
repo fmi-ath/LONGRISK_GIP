@@ -25,7 +25,7 @@ def initiate_GRASS_sesion(mygisdb, mylocation, mymapset, CRS_code = 4326):
             Name of the location for the current session.
         mymapset : str
             Name of the mapset for the current session.
-        CRS_code : int
+        CRS_code : int | str
             Optional CRS for the current session.
     """
 

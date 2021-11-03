@@ -19,10 +19,15 @@ config = common.CONFIG
 
 # Path setup
 temp_folder = common.get_path_for('temporary')
+store_folder = common.get_path_for('processed')  # dump final modified files here
 grassdata_folder = common.get_path_for('mygisdb')
 
 print('Checking that output folders exist...', end=' ')
 common.ensure_folders_exist()
+# subfolders for this script
+(temp_folder / 'rain').mkdir(exist_ok=True)
+(grassdata_folder / 'rain').mkdir(exist_ok=True)
+(grassdata_folder / 'infiltration').mkdir(exist_ok=True)
 print('Done.')
 
 #* ---
@@ -41,28 +46,23 @@ if not crop_polygon_crs:
 x_coords = config.get('cropping', 'x_polygon_coords', fallback='')
 y_coords = config.get('cropping', 'y_polygon_coords', fallback='')
 if x_coords and y_coords:
-    lx = []
-    ly = []
-    for t in x_coords.split():
-        try:
-            lx.append(float(t))
-        except ValueError as e:
-            raise ValueError(f'Polygon coords should be float or integer, not {t}') from e
-    for t in y_coords.split():
-        try:
-            ly.append(float(t))
-        except ValueError as e:
-            raise ValueError(f'Polygon coords should be float or integer, not {t}') from e
+
+    try:
+        lx = list(map(float, x_coords.split()))
+    except ValueError as e:
+        raise ValueError('Polygon coords should be float or integer') from e
+    try:
+        ly = list(map(float, y_coords.split()))
+    except ValueError as e:
+        raise ValueError('Polygon coords should be float or integer') from e
 
     crop_polygon_coords = list(zip(lx, ly))
 
 else:
     crop_polygon_coords = None
 
-null_value = config.getfloat('cropping', 'mask_value')
-
-if not null_value:
-    null_value = -9999.
+null_value = config.get('cropping', 'mask_value')
+null_value = float(null_value) if null_value else -9999.
 
 #* ---
 #* 1. Downdload DEMs of interest:
@@ -73,12 +73,10 @@ if not null_value:
 
 if config.getboolean('merging', 'DEM_merge_boolean'):
 
-    rasters_folder_path = config.get('merging', 'DEM_file_path_to_merge')
+    rasters_folder_path = common.get_path_for('DEM')
     merged_file_path = os.path.join(temp_folder, 'DEM_merged.tif')
-    merge_search_criteria = config.get('merging', 'DEM_merge_search_criteria')
 
     dsc = config.get('merging', 'DEM_merge_search_criteria')
-
     merge_search_criteria = dsc.split()
 
     utl.raster_merge(rasters_folder_path, merged_file_path, search_criteria=merge_search_criteria)
@@ -134,17 +132,17 @@ except ValueError as e:
 
 xmax = config.get('rain', 'x_max')
 ymin = config.get('rain', 'y_min')
-# FIXME: Fails if keys are provided but no value (cannot convert '' to float)
-xrotation = config.getfloat('rain', 'x_rotation')
-xres = config.getfloat('rain', 'x_res')
-yrotation = config.getfloat('rain', 'y_rotation')
-yres = config.getfloat('rain', 'y_res')
+xres = config.get('rain', 'x_res')
+yres = config.get('rain', 'y_res')
+xrotation = config.get('rain', 'x_rotation')
+yrotation = config.get('rain', 'y_rotation')
 
 xmax = float(xmax) if xmax else None
 ymin = float(ymin) if ymin else None
-
-xres = float(xres) if xres else None  # FIXME: Obsolete if getfloat() is used above
+xres = float(xres) if xres else None
 yres = float(yres) if yres else None
+xrotation = float(xrotation) if xrotation else None
+yrotation = float(yrotation) if yrotation else None
 
 if GTiff_files_path:
     rain_crop_search_criteria = config.get('rain', 'rain_crop_search_criteria')

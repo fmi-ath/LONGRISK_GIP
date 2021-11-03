@@ -4,8 +4,6 @@ import subprocess
 from configparser import ConfigParser
 from pathlib import Path
 
-# pylint: disable=import-error
-import modules.GRASS_utils as grutl
 # import some convenient GRASS GIS Python API parts
 from grass.script import core as gcore
 import grass.script as gscript
@@ -16,24 +14,23 @@ from grass.pygrass.modules.shortcuts import raster as r
 from grass.pygrass.modules.shortcuts import vector as v
 from grass.pygrass.modules.shortcuts import temporal as t
 
+import modules.GRASS_utils as grutl
+from modules import common
+
 #* ---
 #* We read the input information from the ini file and then the magic happens
 #* ---
 
-ini_config_file = sys.argv[1]
-
 # instantiate
-config = ConfigParser()
+config = common.CONFIG
 
 # parse existing file
-config.read(ini_config_file)
 grass_info = config['grass_info']
 grass_time = config['grass_time']
 grass_input = config['grass_input']
 grass_output = config['grass_output']
 grass_statistics = config['grass_statistics']
 grass_options = config['grass_options']
-storage_conf = config['storage']
 
 #* Create a rc file for grass if it doesn't exist yet
 # If GISRC is set, assume valid path. Else default to grass's default: $HOME/.grass7/rc
@@ -44,7 +41,7 @@ if gisrc is None or not gisrc:
 gisrc = Path(gisrc).expanduser().resolve()
 
 if not gisrc.exists():
-    print(f'GISRC file {gisrc} does not exist! Creating one based on {ini_config_file}:')
+    print(f'GISRC file {gisrc} does not exist! Creating one based on {common.config_file_name}:')
     rcstr = (f"GISDBASE: {grass_info.get('mygisdb')}\n"
              f"LOCATION_NAME: {grass_info.get('mylocation')}\n"
              f"MAPSET: {grass_info.get('mymapset')}\n"
@@ -63,17 +60,17 @@ if not gisrc.exists():
 #*    not exists, it creates it. If it exists, it opens it and load the files
 #* ---
 
-mygisdb = grass_info.get('mygisdb', 'GRASS_itzi/grassdata')
-mylocation = grass_info.get('mylocation')
-mymapset = grass_info.get('mymapset')
+grassdata_path = common.get_path_for('grass_db')
+location = grass_info.get('mylocation')
+mapset = grass_info.get('mymapset')
 CRS = grass_info.get('CRS')
 
-mapset_path = Path(os.path.join(mygisdb, mylocation, mymapset))
+mapset_path = Path(os.path.join(grassdata_path, location, mapset))
 
-if os.path.exists(mapset_path):
-    subprocess.call(["rm", "-r", mapset_path])
+if mapset_path.exists():
+    subprocess.call(["rm", "-r", str(mapset_path)])
 
-user = grutl.initiate_GRASS_sesion(mygisdb, mylocation, mymapset, CRS_code = CRS)
+user = grutl.initiate_GRASS_sesion(str(grassdata_path), location, mapset, CRS_code=CRS)
 
 #* ---
 #* 3. Add all the relevant rasters for the simulation.
@@ -82,17 +79,17 @@ user = grutl.initiate_GRASS_sesion(mygisdb, mylocation, mymapset, CRS_code = CRS
 #*    output = Helsinki_cropped)
 #* ---
 
-rasters_path = Path(mygisdb)
+rasters_path = Path(grassdata_path)
 
 g.list(flags = 'p', type = 'raster')
 
 grutl.import_multiple_raster_files(rasters_path, search_criteria = '*.tif')
 
 # Set the region to match the raster of interest
-g.region(raster = f'DEM_cropped@{mymapset}')
+g.region(raster = f'DEM_cropped@{mapset}')
 
 # We would like to mask data that falls outside the boundaries for the simulation
-r.mask(raster = f'DEM_cropped@{mymapset}')
+r.mask(raster = f'DEM_cropped@{mapset}')
 
 # If you would like to check the imported files
 g.list(flags = 'p', type = 'raster')
@@ -139,11 +136,10 @@ t.register(type = 'raster', input = stds, file = str(rain_txt_file))
 #*    simulation. All the parameters must be strings.
 #* ---
 
-output_itzi_file = Path(storage_conf.get('store_root')) / storage_conf.get('itzi_config_file')
+itzi_output_path = common.get_path_for('itzi_output')
+output_itzi_file = itzi_output_path / 'itzi_config_file.ini'
 grass_bin_path = grass_info.get('grass_bin_path')
-grassdata_path = mygisdb
-location = mylocation
-mapset = mymapset
+
 end_time = grass_time.get('end_time')
 record_step = grass_time.get('record_step')
 duration = grass_time.get('duration')
@@ -189,11 +185,11 @@ if not infiltration:
 
 losses = grass_input.get('losses') or 'losses'
 
-prefix = grass_output.get('prefix') or f'{mymapset}_itzi'
+prefix = grass_output.get('prefix') or f'{mapset}_itzi'
 
 values = grass_output.get('values')
 
-stats_file = grass_statistics.get('stats_file') or f'GRASS_itzi/{mymapset}_itzi.csv'
+stats_file = grass_statistics.get('stats_file') or itzi_output_path / f'{mapset}_itzi.csv'
 
 hmin = grass_options.get('hmin')
 slmax = grass_options.get('slmax')

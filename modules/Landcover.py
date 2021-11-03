@@ -20,16 +20,19 @@ class Landcover:
 
         dataset = gdal.Open(root_landcover_file, gdal.GA_ReadOnly)
         proj = osr.SpatialReference(wkt = dataset.GetProjection())
-        geotransform = dataset.GetGeoTransform()
         band = dataset.GetRasterBand(1) # Note GetRasterBand() takes band no. starting from 1 not 0
         arr = band.ReadAsArray()
 
         self._root = Path(root_landcover_file).resolve() # Resolve to remove relative paths
         self._arr = arr
         self._shape = arr.shape
-        self._geotransform = geotransform
+        self._geotransform = dataset.GetGeoTransform()
         self._crs_code = int(proj.GetAttrValue('AUTHORITY',1)) # get the EPSG number as integer
         self._crs = f'EPSG:{self._crs_code}'
+        self._crs_wkt = proj.ExportToWkt()
+
+        band = None
+        dataset = None
 
     def get_friction(self):
         """Calculate friction at each pixel according to Landcover's file category.
@@ -171,11 +174,7 @@ class Landcover:
 
         raster = driver.Create(filename, self._shape[1], self._shape[0], 1, dtype)
         raster.SetGeoTransform(self._geotransform)  # Specify its coordinates
-
-        srs = osr.SpatialReference()                 # Establish its coordinate encoding
-        srs.ImportFromEPSG(self._crs_code)
-
-        raster.SetProjection( srs.ExportToWkt() )   # Exports the coordinate system to the file
+        raster.SetProjection(self._crs_wkt)   # Exports the coordinate system to the file
         raster.GetRasterBand(1).WriteArray(array)   # Writes my array to the raster
 
         raster.FlushCache()
