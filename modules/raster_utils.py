@@ -1,6 +1,7 @@
 import os
 import glob
 import json
+import concurrent.futures
 from math import floor
 from pathlib import Path
 
@@ -11,7 +12,6 @@ from rasterio.mask import mask
 from rasterio.merge import merge
 from shapely.geometry import Polygon
 import geopandas as gpd
-from fiona.crs import from_epsg
 from osgeo import gdal, osr
 
 def _ensure_list(list_or_any):
@@ -79,44 +79,50 @@ def ascii_to_geotiff(ascii_files_path, GTiff_files_path, xmin, ymax, search_crit
     if xres is None and xmax is None:
         raise ValueError("If 'xres' not given, 'xmax' has to be given")
 
-    if yres is None and ymax is None:
+    if yres is None and ymin is None:
         raise ValueError("If 'yres' not given, 'ymin' has to be given")
 
     # GDAL setup
-    driver = gdal.GetDriverByName('GTiff')
+    # driver = gdal.GetDriverByName('GTiff')
     srs = osr.SpatialReference()
     srs.ImportFromEPSG(CRS_code)
     projection_wkt = srs.ExportToWkt()
 
     path = _glob_path(ascii_files_path, search_criteria)
 
-    for filename in path:
+    # Figure out geotransform
+    array = np.loadtxt(path[0])
+    nrows, ncols = np.shape(array)
 
-        array = np.genfromtxt(filename, dtype=np.float32)
+    if xres is None:
+        xres = (xmax - xmin) / float(ncols)
 
-        nrows, ncols = np.shape(array)
+    if yres is None:
+        yres = (ymax - ymin) / float(nrows)
 
-        # Note: xres and yres are calculated only once as both are not None after first loop
-        if xres is None:
-            xres = (xmax - xmin) / float(ncols)
+    # Upper-left corner coordinates
+    geotransform = (xmin, xres, xrotation, ymax, yrotation, -1 * yres)
 
-        if yres is None:
-            yres = (ymax - ymin) / float(nrows)
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        futures = []
+        for filename in path:
+            p = executor.submit(_process_ascii, filename, GTiff_files_path, geotransform, projection_wkt)
+            futures.append(p)
 
-        # Upper-left corner coordinates
-        geotransform = (xmin, xres, xrotation, ymax, yrotation, -1 * yres)
+def _process_ascii(fname, output_path, geotransform, projection_wkt):
+    array = np.loadtxt(fname)
+    nrows, ncols = array.shape
 
-        GTiff_destination_file = os.path.join(GTiff_files_path,
-                                              Path(filename).with_suffix('.tif').name)
+    destination_file = os.path.join(output_path, Path(fname).with_suffix('.tif').name)
 
-        output_raster = driver.Create(GTiff_destination_file, ncols, nrows, 1 ,gdal.GDT_Float32)
-        output_raster.SetGeoTransform(geotransform)
-        output_raster.SetProjection(projection_wkt)
-        output_raster.GetRasterBand(1).WriteArray(array)
+    driver = gdal.GetDriverByName('GTiff')
+    output_raster = driver.Create(destination_file, ncols, nrows, 1, gdal.GDT_Float32)
+    output_raster.SetGeoTransform(geotransform)
+    output_raster.SetProjection(projection_wkt)
+    output_raster.GetRasterBand(1).WriteArray(array)
 
-        output_raster.FlushCache()
-        output_raster = None
-
+    output_raster.FlushCache()
+    output_raster = None
 
 def rain_relocation(GTiff_files_path, xmin, ymax, X_target, Y_target, X_radar_rain,
                     Y_radar_rain, search_criteria ='*.txt', CRS_code=3067, xmax=None, xrotation=0,
@@ -477,7 +483,7 @@ def raster_crop(raster_to_crop_path, cropped_file_path = None, search_criteria =
 
     elif (polygon_coords is not None) and (polygon_crs is not None):
         geo = gpd.GeoDataFrame({'geometry': Polygon(polygon_coords)}, index=[0],
-                               crs=from_epsg(polygon_crs))
+                               crs=f"EPSG:{polygon_crs}")
 
     else:
         raise ValueError('Vector or Polygon needed for cropping')
