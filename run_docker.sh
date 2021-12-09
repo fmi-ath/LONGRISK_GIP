@@ -3,9 +3,9 @@
 name="longrisk-gip"
 srcbindpoint=/usr/src/app/
 databindpoint=/data/
-datafolder=$HOME/data/longrisk/
+datafolder="$(realpath ../data/)"
 # Limit container's resource usage
-cpus='12.5'
+cpus='20'
 memory='32g'
 memory_swap='33g' # True swap amount is memory_swap - memory.
 
