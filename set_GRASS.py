@@ -1,7 +1,5 @@
 import os
-import sys
 import subprocess
-from configparser import ConfigParser
 from pathlib import Path
 
 # import some convenient GRASS GIS Python API parts
@@ -42,9 +40,9 @@ gisrc = Path(gisrc).expanduser().resolve()
 
 if not gisrc.exists():
     print(f'GISRC file {gisrc} does not exist! Creating one based on {common.config_file_name}:')
-    rcstr = (f"GISDBASE: {grass_info.get('mygisdb')}\n"
-             f"LOCATION_NAME: {grass_info.get('mylocation')}\n"
-             f"MAPSET: {grass_info.get('mymapset')}\n"
+    rcstr = (f"GISDBASE: {grass_info.get('grass_db')}\n"
+             f"LOCATION_NAME: {grass_info.get('location')}\n"
+             f"MAPSET: {grass_info.get('mapset')}\n"
              "GUI: text\n")
     print(f'\n{rcstr}')
     with open(gisrc, 'w', encoding='utf-8') as f:
@@ -52,17 +50,17 @@ if not gisrc.exists():
 
 #* ---
 #* 1. We define the paths in which we would like to work out the simulation
-#*     - mygisdb: str. Path of working location
-#*     - mylocation: str. Name of the location (Ex. Helsinki)
-#*     - mymapset: str. User that will be working on that location
+#*     - grass_db: str. Path of working location
+#*     - location: str. Name of the location (Ex. Helsinki)
+#*     - mapset: str. User that will be working on that location
 #*
 #* 2. We initiate the grass session with 'initiate_GRASS_sesion'. If sessions does
 #*    not exists, it creates it. If it exists, it opens it and load the files
 #* ---
 
 grassdata_path = common.get_path_for('grass_db')
-location = grass_info.get('mylocation')
-mapset = grass_info.get('mymapset')
+location = grass_info.get('location')
+mapset = grass_info.get('mapset')
 CRS = grass_info.get('CRS')
 
 mapset_path = Path(os.path.join(grassdata_path, location, mapset))

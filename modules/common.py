@@ -16,16 +16,19 @@ CONFIG = ConfigParser()
 CONFIG.read(config_file_name)
 
 def get_path_for(p: str) -> Path :
-    """[summary]
+    """Helper function to get path settings from configuration (*_files parameters)
+
+    Example: if p=temporary, return value for temporary_files
 
     Args:
-        p (str): [description]
+        p (str): tag for the configuration parameter (that ends with _files) or
+                 `mygisdb` or `grass_db` for GRASS database path
 
     Returns:
-        Path: [description]
+        Path: value from configuration file
     """
     if p in {'mygisdb', 'grass_db'}:
-        return Path(CONFIG.get('grass_info', 'mygisdb'))
+        return Path(CONFIG.get('grass_info', 'grass_db'))
     path = CONFIG.get('folders', f'{p}_files')
     return Path(path)
 

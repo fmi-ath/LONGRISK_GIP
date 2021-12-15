@@ -44,12 +44,14 @@ class Landcover:
 
         new_arr = np.zeros(self._shape)
 
+        # Landcover category and its friction value
         singles = (
             (14, 0.04),
             (15, 0.08),
             (16, 0.03),
         )
 
+        # Multiple subsequent categories have same value (inclusive range)
         ranges = (
             (1, 4, 0.08),
             (5, 7, 0.02),
@@ -83,6 +85,7 @@ class Landcover:
 
         arr = self._arr
 
+        # Only classes from 1 to 7 and 11 have value 10, others have value of 0
         new_arr = np.where(((arr >= 1) & (arr <= 7)) + (arr == 11), 10, 0)
 
         output_file = os.path.join(self._root.parent, 'losses.tif')

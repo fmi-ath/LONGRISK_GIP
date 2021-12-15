@@ -15,12 +15,23 @@ import geopandas as gpd
 from osgeo import gdal, osr
 
 def _ensure_list(list_or_any):
-    """'string' -> ['string']"""
+    """Check that list_or_any is a list, if not then put it into one.
+
+    For example: 'string' -> ['string']"""
     if not isinstance(list_or_any, list):
         return [list_or_any]
     return list_or_any
 
 def _glob_path(search_path, search_criteria):
+    """Find files that match search criteria within the folder
+
+    Args:
+        search_path (str or pathlib.Path): Path to-be-searched
+        search_criteria (str or list): Match criteria
+
+    Returns:
+        list: list of paths matching the search criteria pattern(s)
+    """
     if Path(search_path).suffix == '':
         search_criteria = _ensure_list(search_criteria)
 
@@ -110,6 +121,14 @@ def ascii_to_geotiff(ascii_files_path, GTiff_files_path, xmin, ymax, search_crit
             futures.append(p)
 
 def _process_ascii(fname, output_path, geotransform, projection_wkt):
+    """Convert ascii file to geotiff
+
+    Args:
+        fname (file, str, pathlib.Path): ASCII file
+        output_path (str or pathlib.Path): Output folder
+        geotransform (tuple): GDAL GeoTransform tuple
+        projection_wkt (str): Projection string
+    """
     array = np.loadtxt(fname)
     nrows, ncols = array.shape
 
@@ -601,6 +620,14 @@ def vector_intersection(vector_file_1, vector_file_2, output_file):
 
 
 def _load_gdal_raster(filename):
+    """[summary]
+
+    Args:
+        filename (str): Raster file
+
+    Returns:
+        tuple of (numpy.array, dict): raster data and its spatial reference and geotransform
+    """
     dataset = gdal.Open(filename, gdal.GA_ReadOnly)
     band = dataset.GetRasterBand(1)
 

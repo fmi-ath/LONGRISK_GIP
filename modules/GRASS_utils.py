@@ -89,6 +89,8 @@ def import_multiple_raster_files(path, search_criteria = '*.tif'):
 
         Parameters
         ----------
+        path : str or Path
+            Folder where to search for the files
         search_criteria : list or str
             List of criteria for searhing the rasters to be imported.
     """
@@ -210,9 +212,6 @@ def create_itzi_config_file(output_file, record_step=None, dem=None, friction=No
     ----------
     output_file : str
         Name of the output .ini file.
-    record_step :
-    dem :
-    friction :
 
     Returns
     -------

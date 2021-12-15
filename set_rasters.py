@@ -1,7 +1,5 @@
-import sys
 import os
 import glob
-from configparser import ConfigParser
 from pathlib import Path
 
 import rasterio as rio
@@ -20,7 +18,7 @@ config = common.CONFIG
 # Path setup
 temp_folder = common.get_path_for('temporary')
 store_folder = common.get_path_for('processed')  # dump final modified files here
-grassdata_folder = common.get_path_for('mygisdb')
+grassdata_folder = common.get_path_for('grass_db')
 
 print('Checking that output folders exist...', end=' ')
 common.ensure_folders_exist()
@@ -165,7 +163,7 @@ else:
 
     raise ValueError('No rain data path provided')
 
-if config.get('rain', 'rain_relocation'):
+if config.get('rain', 'rain_relocation'): # BUG: Any string is True, not just "True"
 
     print('\nRain data is being relocated...\n')
 

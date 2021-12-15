@@ -1,5 +1,4 @@
-import sys
-from configparser import ConfigParser
+"""Extract the Itzi output from gisdb and store them to GeoTIFF files"""
 
 import modules.GRASS_utils as grutl
 from modules import common
@@ -12,9 +11,9 @@ from modules import common
 
 config = common.CONFIG
 
-mygisdb = common.get_path_for('mygisdb')
-mylocation = config.get('grass_info', 'mylocation')
-mymapset = config.get('grass_info', 'mymapset')
+mygisdb = common.get_path_for('grass_db')
+mylocation = config.get('grass_info', 'location')
+mymapset = config.get('grass_info', 'mapset')
 CRS = config.get('grass_info', 'CRS')
 prefix = config.get('grass_output', 'prefix')
 if not prefix:
