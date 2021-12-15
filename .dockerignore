@@ -1,7 +1,15 @@
+# Ignore .git
 .git
+
+# Ignore secrets and other private information
 .gitignore
-*.py[cdo]
+.dockerignore
 .grass7
+
+# Ignore files that are irrelevant for running the container
+*.py[cdo]
+*_docker.sh
+
+# Ignore volatile files and runtime-generated files
 GRASS_itzi
 .*_history
-*_docker.sh
