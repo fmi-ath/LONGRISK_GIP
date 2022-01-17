@@ -6,3 +6,4 @@ geopandas
 fiona
 pycrs
 pyproj
+opencv-python

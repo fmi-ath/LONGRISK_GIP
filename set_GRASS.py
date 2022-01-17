@@ -144,7 +144,7 @@ duration = grass_time.get('duration')
 dem = grass_input.get('dem') or 'DEM_cropped'
 friction = grass_input.get('friction') or 'friction'
 rain = stds
-start_h = grass_input.get('start_h', '')
+start_h = 'start_h.tif'
 start_y = grass_input.get('start_y', '')
 inflow = grass_input.get('inflow', '')
 bctype = grass_input.get('bctype', '')
@@ -180,6 +180,9 @@ if not infiltration:
     else:
 
         infiltration = 'infiltration_0'
+
+# Add the start_h file
+gcore.run_command('r.in.gdal', input = grassdata_path / start_h, output = start_h)
 
 losses = grass_input.get('losses') or 'losses'
 

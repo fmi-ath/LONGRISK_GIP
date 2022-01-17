@@ -6,9 +6,9 @@ databindpoint=/data/
 datafolder="$(realpath ../data/)"
 outputfolder="$(realpath ../out/)"
 # Limit container's resource usage
-cpus='20'
-memory='32g'
-memory_swap='33g' # True swap amount is memory_swap - memory.
+cpus='4'
+memory='4g'
+memory_swap='6g' # True swap amount is memory_swap - memory.
 
 docker run -it --rm \
     --user=$(id -u):$(id -g) \

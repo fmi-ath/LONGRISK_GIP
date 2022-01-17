@@ -4,7 +4,7 @@ import json
 import concurrent.futures
 from math import floor
 from pathlib import Path
-
+import fnmatch
 import numpy as np
 import rasterio
 from rasterio.warp import calculate_default_transform, reproject, Resampling
@@ -203,7 +203,10 @@ def rain_relocation(GTiff_files_path, xmin, ymax, X_target, Y_target, X_radar_ra
     path = _glob_path(GTiff_files_path, search_criteria)
 
     for filename in path:
-
+        # This prevents extra relocated files.
+        if fnmatch.fnmatch(filename, '*relocated*'):
+            print(filename + " skipped as it was already relocated according its filename")
+            continue
         # Note GetRasterBand() takes band no. starting from 1 not 0
         dataset = gdal.Open(filename, gdal.GA_ReadOnly)
         # proj = osr.SpatialReference(wkt = dataset.GetProjection())

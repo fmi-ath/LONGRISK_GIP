@@ -6,6 +6,7 @@ import rasterio as rio
 
 import modules.Landcover as LC
 import modules.raster_utils as utl
+import modules.water_depth_map as wdm
 from modules import common
 
 #* ---
@@ -113,6 +114,21 @@ if config.getboolean('cropping', 'DEM_crop_boolean'):
 
 # If you would like to visualize it
 #rio.plot.show(rasterio.open(cropped_file_path), cmap='terrain')
+
+#* ---
+#* 3.1. Here a map describing the water depth in the initial timestep is created so that it corresponds to the cropped DEM above.
+#* ---
+
+def create_start_water_depth_file(input_file_path, output_file_path):
+    water_depth_method_exists_in_config = (config.get('water', 'method') != '')
+    
+    if water_depth_method_exists_in_config:
+        dem, profile = wdm.single_dem(input_file_path)
+        watermap = wdm.main(dem, profile)
+        wdm.write_watermap_to_output(watermap, output_file_path, profile)
+
+output_file_path = os.path.join(grassdata_folder, 'start_h.tif')
+create_start_water_depth_file(dem_cropped_file_path, output_file_path), 
 
 #* ---
 #* 4. Now we proceed to extract the rain rasters
