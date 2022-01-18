@@ -1,5 +1,6 @@
 import os
 import glob
+import numpy as np
 from pathlib import Path
 
 import rasterio as rio
@@ -69,8 +70,8 @@ null_value = float(null_value) if null_value else -9999.
 #* 2. If the region of interest lays in the intersection of different DEMs, we can merge them into a
 #*    single GeoTiff file:
 #* ---
-
-if config.getboolean('merging', 'DEM_merge_boolean'):
+merge_is_used = config.getboolean('merging', 'DEM_merge_boolean')
+if merge_is_used:
 
     rasters_folder_path = common.get_path_for('DEM')
     merged_file_path = os.path.join(temp_folder, 'DEM_merged.tif')
@@ -96,8 +97,8 @@ else:
 #*
 #*    If vector file not given, then both polygon coordinates and crs MUST be given
 #* ---
-
-if config.getboolean('cropping', 'DEM_crop_boolean'):
+crop_is_used = config.getboolean('cropping', 'DEM_crop_boolean')
+if crop_is_used:
 
     dem_cropped_file_path = os.path.join(grassdata_folder, 'DEM_cropped.tif')
     crop_search_criteria = config.get('cropping', 'DEM_crop_search_criteria')
@@ -116,7 +117,8 @@ if config.getboolean('cropping', 'DEM_crop_boolean'):
 #rio.plot.show(rasterio.open(cropped_file_path), cmap='terrain')
 
 #* ---
-#* 3.1. Here a map describing the water depth in the initial timestep is created so that it corresponds to the cropped DEM above.
+#* 3.1. Here a map describing the water depth in the initial timestep is created so that 
+# it corresponds to the cropped DEM above or just the dem if it is not cropped.
 #* ---
 
 def create_start_water_depth_file(input_file_path, output_file_path):
@@ -128,112 +130,122 @@ def create_start_water_depth_file(input_file_path, output_file_path):
         wdm.write_watermap_to_output(watermap, output_file_path, profile)
 
 output_file_path = os.path.join(grassdata_folder, 'start_h.tif')
-create_start_water_depth_file(dem_cropped_file_path, output_file_path), 
+input_file_for_depth_and_constant_rain = dem_cropped_file_path if crop_is_used else (merged_file_path if merge_is_used else raster_to_crop_path)
+create_start_water_depth_file(input_file_for_depth_and_constant_rain, output_file_path), 
 
 #* ---
 #* 4. Now we proceed to extract the rain rasters
 #* ---
 
-ascii_files_path = config.get('rain', 'ascii_files_path')
-GTiff_files_path = config.get('rain', 'GTiff_files_path')
-
-try:
-    xmin = config.getfloat('rain', 'x_min')
-    ymax = config.getfloat('rain', 'y_max')
-    EPSG_code = config.getint('rain', 'EPSG_code')
-except ValueError as e:
-    raise ValueError('xmin, ymax and EPSG_code are mandatory') from e
-
-xmax = config.get('rain', 'x_max')
-ymin = config.get('rain', 'y_min')
-xres = config.get('rain', 'x_res')
-yres = config.get('rain', 'y_res')
-xrotation = config.get('rain', 'x_rotation')
-yrotation = config.get('rain', 'y_rotation')
-
-xmax = float(xmax) if xmax else None
-ymin = float(ymin) if ymin else None
-xres = float(xres) if xres else None
-yres = float(yres) if yres else None
-xrotation = float(xrotation) if xrotation else None
-yrotation = float(yrotation) if yrotation else None
-
-if GTiff_files_path:
-    rain_crop_search_criteria = config.get('rain', 'rain_crop_search_criteria')
-
-elif ascii_files_path:
-
-    print('\nRain data is in ascii format and its being converted to Tif format...\n')
-
-    GTiff_files_path = os.path.join(temp_folder, 'rain')
-    ascii_search_criteria = config.get('rain', 'ascii_search_criteria')
-
-    utl.ascii_to_geotiff(ascii_files_path, GTiff_files_path, xmin, ymax,
-                         search_criteria=ascii_search_criteria, CRS_code=EPSG_code,
-                         xmax=xmax, xrotation=xrotation, xres=xres,
-                         yrotation=yrotation, ymin=ymin, yres=yres)
-
-    print('\nDONE\n')
+constant_rain_is_used = config.getboolean('rain', 'constant')
+if constant_rain_is_used:
+    # create constant rain file
+    intensity_constant = config.getfloat('rain', 'intensity_constant')
+    rain_output_file_path = os.path.join(grassdata_folder, 'constant_rain.tif')
+    rain_dem, rain_profile = wdm.single_dem(input_file_for_depth_and_constant_rain)
+    wdm.write_watermap_to_output(np.ones_like(rain_dem) * intensity_constant, rain_output_file_path, rain_profile)
 
 else:
+    ascii_files_path = config.get('rain', 'ascii_files_path')
+    GTiff_files_path = config.get('rain', 'GTiff_files_path')
 
-    raise ValueError('No rain data path provided')
+    try:
+        xmin = config.getfloat('rain', 'x_min')
+        ymax = config.getfloat('rain', 'y_max')
+        EPSG_code = config.getint('rain', 'EPSG_code')
+    except ValueError as e:
+        raise ValueError('xmin, ymax and EPSG_code are mandatory') from e
 
-if config.get('rain', 'rain_relocation'): # BUG: Any string is True, not just "True"
+    xmax = config.get('rain', 'x_max')
+    ymin = config.get('rain', 'y_min')
+    xres = config.get('rain', 'x_res')
+    yres = config.get('rain', 'y_res')
+    xrotation = config.get('rain', 'x_rotation')
+    yrotation = config.get('rain', 'y_rotation')
 
-    print('\nRain data is being relocated...\n')
+    xmax = float(xmax) if xmax else None
+    ymin = float(ymin) if ymin else None
+    xres = float(xres) if xres else None
+    yres = float(yres) if yres else None
+    xrotation = float(xrotation) if xrotation else None
+    yrotation = float(yrotation) if yrotation else None
 
-    X_target = config.getfloat('rain', 'X_target')
-    Y_target = config.getfloat('rain', 'Y_target')
-    X_radar_rain = config.getfloat('rain', 'X_radar_rain')
-    Y_radar_rain = config.getfloat('rain', 'Y_radar_rain')
-    relocation_search_criteria = config.get('rain', 'relocation_search_criteria')
+    if GTiff_files_path:
+        rain_crop_search_criteria = config.get('rain', 'rain_crop_search_criteria')
 
-    utl.rain_relocation(GTiff_files_path, xmin, ymax, X_target, Y_target, X_radar_rain,
-                        Y_radar_rain, search_criteria=relocation_search_criteria,CRS_code=EPSG_code,
-                        xmax=xmax, xrotation=xrotation, xres=xres,
-                        yrotation=yrotation, ymin=ymin, yres=yres)
+    elif ascii_files_path:
 
-    rain_crop_search_criteria = '*_relocated.tif'
+        print('\nRain data is in ascii format and its being converted to Tif format...\n')
+
+        GTiff_files_path = os.path.join(temp_folder, 'rain')
+        ascii_search_criteria = config.get('rain', 'ascii_search_criteria')
+
+        utl.ascii_to_geotiff(ascii_files_path, GTiff_files_path, xmin, ymax,
+                            search_criteria=ascii_search_criteria, CRS_code=EPSG_code,
+                            xmax=xmax, xrotation=xrotation, xres=xres,
+                            yrotation=yrotation, ymin=ymin, yres=yres)
+
+        print('\nDONE\n')
+
+    else:
+
+        raise ValueError('No rain data path provided')
+
+    if config.get('rain', 'rain_relocation'): # BUG: Any string is True, not just "True"
+
+        print('\nRain data is being relocated...\n')
+
+        X_target = config.getfloat('rain', 'X_target')
+        Y_target = config.getfloat('rain', 'Y_target')
+        X_radar_rain = config.getfloat('rain', 'X_radar_rain')
+        Y_radar_rain = config.getfloat('rain', 'Y_radar_rain')
+        relocation_search_criteria = config.get('rain', 'relocation_search_criteria')
+
+        utl.rain_relocation(GTiff_files_path, xmin, ymax, X_target, Y_target, X_radar_rain,
+                            Y_radar_rain, search_criteria=relocation_search_criteria,CRS_code=EPSG_code,
+                            xmax=xmax, xrotation=xrotation, xres=xres,
+                            yrotation=yrotation, ymin=ymin, yres=yres)
+
+        rain_crop_search_criteria = '*_relocated.tif'
 
     print('\nDONE\n')
 
-#* ---
-#* 5. Let's check if the rain rasters have same projection as raster of interest
-#* ---
+    #* ---
+    #* 5. Let's check if the rain rasters have same projection as raster of interest
+    #* ---
 
-reference_file_path = os.path.join(grassdata_folder, 'DEM_cropped.tif')
+    reference_file_path = os.path.join(grassdata_folder, 'DEM_cropped.tif')
 
-if Path(GTiff_files_path).suffix == '':
-    source_fname = next(glob.iglob(f"{GTiff_files_path}/*.tif"))  # we need only one file
-    reproj = utl.raster_check_projection(source_fname, ref_fp = reference_file_path)
+    if Path(GTiff_files_path).suffix == '':
+        source_fname = next(glob.iglob(f"{GTiff_files_path}/*.tif"))  # we need only one file
+        reproj = utl.raster_check_projection(source_fname, ref_fp = reference_file_path)
 
-else:
+    else:
 
-    reproj = utl.raster_check_projection(GTiff_files_path, ref_fp = reference_file_path)
+        reproj = utl.raster_check_projection(GTiff_files_path, ref_fp = reference_file_path)
 
-if reproj:
+    if reproj:
 
-    root_reproj_rain_file = os.path.join(temp_folder, 'rain')
+        root_reproj_rain_file = os.path.join(temp_folder, 'rain')
 
-    print('\nRain file(s) being reprojected to match DEMs projection...\n')
-    utl.raster_reproject(GTiff_files_path, reproj_fp=root_reproj_rain_file,
-                         ref_fp=reference_file_path, search_criteria=rain_crop_search_criteria)
+        print('\nRain file(s) being reprojected to match DEMs projection...\n')
+        utl.raster_reproject(GTiff_files_path, reproj_fp=root_reproj_rain_file,
+                            ref_fp=reference_file_path, search_criteria=rain_crop_search_criteria)
 
-    rain_crop_search_criteria = "*_reproj.tif"
+        rain_crop_search_criteria = "*_reproj.tif"
 
-if config.getboolean('rain', 'rain_crop_boolean'):
+    if config.getboolean('rain', 'rain_crop_boolean'):
 
-    print('\nRain files are being cropped...\n')
+        print('\nRain files are being cropped...\n')
 
-    rain_cropped_file_path = os.path.join(grassdata_folder, 'rain')
+        rain_cropped_file_path = os.path.join(grassdata_folder, 'rain')
 
-    utl.raster_crop(GTiff_files_path, cropped_file_path=rain_cropped_file_path,
-                    search_criteria=rain_crop_search_criteria, vector_file=crop_vector_file,
-                    polygon_coords=crop_polygon_coords, polygon_crs=crop_polygon_crs,
-                    mask_value=null_value, mask_all_touched=True)
+        utl.raster_crop(GTiff_files_path, cropped_file_path=rain_cropped_file_path,
+                        search_criteria=rain_crop_search_criteria, vector_file=crop_vector_file,
+                        polygon_coords=crop_polygon_coords, polygon_crs=crop_polygon_crs,
+                        mask_value=null_value, mask_all_touched=True)
 
-    print('\nDONE\n')
+        print('\nDONE\n')
 
 #* ---
 #* 6. We now turn to landuse information to define: friction, losses and infiltration.

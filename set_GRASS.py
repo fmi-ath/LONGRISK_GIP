@@ -96,37 +96,42 @@ g.list(flags = 'p', type = 'raster')
 #* 5. Create time and space dataset with rain data required for the simulation.
 #* ---
 
-stds = 'rain_minutely'
+constant_rain_used = config.getboolean('rain', 'constant')
+if constant_rain_used:
+    stds = 'constant_rain.tif'
+    gcore.run_command('r.in.gdal', input = grassdata_path / stds, output = stds)
+else:
+    stds = 'rain_minutely'
 
-t.create(output=stds, semantictype='mean', title='Rain Rate', description='Rain rate data for itzi')
+    t.create(output=stds, semantictype='mean', title='Rain Rate', description='Rain rate data for itzi')
 
-#* ---
-#* 6. Import the minutely recorded radar rain events.
-#* ---
+    #* ---
+    #* 6. Import the minutely recorded radar rain events.
+    #* ---
 
-rain_path = rasters_path / 'rain'
+    rain_path = rasters_path / 'rain'
 
-grutl.import_multiple_raster_files(rain_path, search_criteria = '*.tif')
+    grutl.import_multiple_raster_files(rain_path, search_criteria = '*.tif')
 
-g.list(flags = 'p', type = 'raster')
+    g.list(flags = 'p', type = 'raster')
 
-#* ---
-#* 7. Register the minutely rain radar data in the time and space dataset created previously.
-#*    As there are many files and the only way grass allows registering many files at once is with a
-#*    .txt file indicating the name of the files, we will first create the file and then register.
-#* ---
+    #* ---
+    #* 7. Register the minutely rain radar data in the time and space dataset created previously.
+    #*    As there are many files and the only way grass allows registering many files at once is with a
+    #*    .txt file indicating the name of the files, we will first create the file and then register.
+    #* ---
 
-rain_txt_file = rain_path / 'rain_registering_data.txt'
+    rain_txt_file = rain_path / 'rain_registering_data.txt'
 
-start_time = grass_time.get('start_time')
-increment_number = int(grass_time.get('increment_number'))
-increment_unit = grass_time.get('increment_unit')
+    start_time = grass_time.get('start_time')
+    increment_number = int(grass_time.get('increment_number'))
+    increment_unit = grass_time.get('increment_unit')
 
-grutl.create_rain_raster_text_file(rain_path, rain_txt_file, search_criteria='*.tif',
-                                   start_time=start_time, increment_number=increment_number,
-                                   increment_unit=increment_unit)
+    grutl.create_rain_raster_text_file(rain_path, rain_txt_file, search_criteria='*.tif',
+                                    start_time=start_time, increment_number=increment_number,
+                                    increment_unit=increment_unit)
 
-t.register(type = 'raster', input = stds, file = str(rain_txt_file))
+    t.register(type = 'raster', input = stds, file = str(rain_txt_file))
 
 #* ---
 #* 8. We now create the izti configuration file to run the simulation. Here we set all the
@@ -143,6 +148,7 @@ record_step = grass_time.get('record_step')
 duration = grass_time.get('duration')
 dem = grass_input.get('dem') or 'DEM_cropped'
 friction = grass_input.get('friction') or 'friction'
+# tähän ehto jos constant tehdään niin kuin tehtiin start_h.tif:n kanssa ja muuten otetaan grass tietokanta.
 rain = stds
 start_h = 'start_h.tif'
 start_y = grass_input.get('start_y', '')
