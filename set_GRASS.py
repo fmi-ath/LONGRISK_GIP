@@ -150,7 +150,7 @@ dem = grass_input.get('dem') or 'DEM_cropped'
 friction = grass_input.get('friction') or 'friction'
 # tähän ehto jos constant tehdään niin kuin tehtiin start_h.tif:n kanssa ja muuten otetaan grass tietokanta.
 rain = stds
-start_h = 'start_h.tif'
+
 start_y = grass_input.get('start_y', '')
 inflow = grass_input.get('inflow', '')
 bctype = grass_input.get('bctype', '')
@@ -188,6 +188,13 @@ if not infiltration:
         infiltration = 'infiltration_0'
 
 # Add the start_h file
+start_h = grass_input.get('start_h')
+
+start_h_file_is_explicitly_given = start_h != ''
+if not start_h_file_is_explicitly_given:
+    start_h = 'start_h.tif'
+
+# Vaikuttaako tässä se, että alkukartta on cropattu?
 gcore.run_command('r.in.gdal', input = grassdata_path / start_h, output = start_h)
 
 losses = grass_input.get('losses') or 'losses'
