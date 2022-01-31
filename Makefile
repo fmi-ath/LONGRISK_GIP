@@ -17,7 +17,9 @@ run_grass:
 	
 run_itzi:
 	@echo "\n--> Running itzi... <--\n"
+	@cd ../../../tmp/gip/itzi
 	@itzi run GRASS_itzi/itzi_config_file.ini
+	@cd ../../../usr/src/app
 	
 run_export:
 	@echo "\n--> Exporting itzi output files... <--\n"

@@ -100,6 +100,7 @@ constant_rain_used = config.getboolean('rain', 'constant')
 if constant_rain_used:
     stds = 'constant_rain.tif'
     gcore.run_command('r.in.gdal', input = grassdata_path / stds, output = stds)
+    stds = Path(stds).stem
 else:
     stds = 'rain_minutely'
 
@@ -196,6 +197,7 @@ if not start_h_file_is_explicitly_given:
 
 # Vaikuttaako tässä se, että alkukartta on cropattu?
 gcore.run_command('r.in.gdal', input = grassdata_path / start_h, output = start_h)
+start_h = Path(start_h).stem
 
 losses = grass_input.get('losses') or 'losses'
 
