@@ -10,7 +10,7 @@ def read_dem_file_metadata(input_filename):
         return dem_data.meta
 
 
-def create_start_water_depth_file(input_file_path, output_file_path):
+def create_start_water_depth_file(input_file_path, output_file_path, **config):
     water_depth_method_exists_in_config = (config.get('water', 'method') != '')
     
     if water_depth_method_exists_in_config:

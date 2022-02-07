@@ -5,3 +5,4 @@ __pycache__/
 .bash_*
 .python_history
 *.py[cdo]
+*.tif
