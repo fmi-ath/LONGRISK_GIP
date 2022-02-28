@@ -21,8 +21,8 @@ def get_path_for(p: str, config) -> Path :
         Path: value from configuration file
     """
     if p in {'mygisdb', 'grass_db'}:
-        return Path(config.get('grass_info', 'grass_db'))
-    path = config.get('folders', f'{p}_files')
+        return Path(config['grass_info']['grass_db'])
+    path = config['folders'][f'{p}_files']
     return Path(path)
 
 def ensure_folders_exist(config) -> None:

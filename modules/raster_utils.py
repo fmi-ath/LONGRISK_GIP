@@ -6,6 +6,7 @@ from math import floor
 from pathlib import Path
 import fnmatch
 import numpy as np
+from pyparsing import srange
 import rasterio
 from rasterio.warp import calculate_default_transform, reproject, Resampling
 from rasterio.mask import mask
@@ -415,6 +416,7 @@ def raster_merge(rasters_folder_path, merged_file_path, search_criteria = "L*.ti
     # File and folder paths
     out_fp = os.path.join(merged_file_path)
 
+    #print(rasters_folder_path)
     # Remove any suffix to replicate pre-refactoring behaviour here
     path_no_suffix = Path(rasters_folder_path).with_suffix('')
     dem_fps = _glob_path(path_no_suffix, search_criteria)
@@ -423,7 +425,7 @@ def raster_merge(rasters_folder_path, merged_file_path, search_criteria = "L*.ti
 
     # List for the source files
     src_files_to_mosaic = []
-
+    
     # Iterate over raster files and add them to source -list in 'read mode'
     for fp in sorted(dem_fps):
         src = rasterio.open(fp)
@@ -499,25 +501,25 @@ def raster_crop(raster_to_crop_path, cropped_file_path = None, search_criteria =
         crs reference system of the form "EPSG:XXXX"
         polygon_crs = XXXX
     """
-
     if vector_file is not None:
         geo = gpd.read_file(vector_file)
-
     elif (polygon_coords is not None) and (polygon_crs is not None):
         geo = gpd.GeoDataFrame({'geometry': Polygon(polygon_coords)}, index=[0],
                                crs=f"EPSG:{polygon_crs}")
-
     else:
         raise ValueError('Vector or Polygon needed for cropping')
-
+    
+    if not raster_to_crop_path:
+        raster_to_crop_path = ''
+    if not search_criteria:
+        search_criteria = ''
     path = _glob_path(raster_to_crop_path, search_criteria)
-
+    
     if cropped_file_path is not None:
         cropped_file_path = Path(cropped_file_path)
-
+    
     for input_file in path:
         input_file = Path(input_file)
-
         # Read the data
         data = rasterio.open(input_file)
 
