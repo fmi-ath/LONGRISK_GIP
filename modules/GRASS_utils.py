@@ -179,7 +179,7 @@ def create_rain_raster_text_file(rain_raster_path, output_file, search_criteria 
     f.close()
 
 
-def create_itzi_config_file(output_file, config: dict): 
+def create_itzi_config_file(output_file, config_data: dict): 
 
 
     """
@@ -202,16 +202,18 @@ def create_itzi_config_file(output_file, config: dict):
     out : file
         Text file with parameters for itzi simnulation
     """
-    grass_info = config['grass_info']
-    grass_time = config['grass_time']
-    grass_input = config['grass_input']
-    grass_output = config['grass_output']
-    grass_options = config['grass_options']
-    drainage_kws = config['drainage']
+    grass_info = config_data['grass_info']
+    grass_time = config_data['grass_time']
+    grass_input = config_data['grass_input']
+    grass_output = config_data['grass_output']
+    grass_options = config_data['grass_options']
+    drainage_kws = config_data['drainage']
+    grass_statistics = config_data['grass_statistics']
 
     if (grass_time['record_step'] is None) or (grass_input['dem'] is None) or (grass_input['friction'] is None):
         raise ValueError('record_step, dem and friction are mandatory arguments for the simulation')
     
+    # These values are none as they lacked a value in the former version.
     effective_porosity=None
     capillary_pressure=None
     hydraulic_conductivity=None 
@@ -288,7 +290,7 @@ def create_itzi_config_file(output_file, config: dict):
     #? STATISTICS SECTION
     secname = 'statistics'
     config.add_section(secname)
-    config.set(secname, 'stats_file', str(config['grass_statistics']['stats_file']))
+    config.set(secname, 'stats_file', str(grass_statistics['stats_file']))
 
     #? OPTIONS SECTION
     _insert_in_loop('options', grass_options)

@@ -1,4 +1,5 @@
 import os
+import statistics
 import subprocess
 from pathlib import Path
 import sys
@@ -176,19 +177,17 @@ def main(config_filename):
     # tähän ehto jos constant tehdään niin kuin tehtiin start_h.tif:n kanssa ja muuten otetaan grass tietokanta.
     grass_input['rain'] = stds
 
-    start_y = grass_input['start_y']
-    if not start_y:
+    if not grass_input['start_y']:
         grass_input['start_y'] = ''
-    inflow = grass_input['inflow']
-    if not inflow:
+    if not grass_input['inflow']:
         grass_input['inflow'] = ''
-    bctype = grass_input['bctype']
-    if not bctype:
+    if not grass_input['bctype']:
         grass_input['bctype'] = ''
-    bcval = grass_input['bcval']
-    if not bcval:
+    if not grass_input['bcval']:
         grass_input['bcval'] = ''
-    
+    if not grass_statistics['stats_file']:
+        grass_statistics['stats_file'] = ''
+
     infiltration = grass_input['infiltration']
     if not infiltration:
 
