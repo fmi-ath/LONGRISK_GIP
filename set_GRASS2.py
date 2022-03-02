@@ -82,11 +82,12 @@ def main(config_filename):
     #*     - location: str. Name of the location (Ex. Helsinki)
     #*     - mapset: str. User that will be working on that location
     #*
-    #* 2. We initiate the grass session with 'initiate_GRASS_sesion'. If sessions does
+    #* 2. We initiate the grass session with 'initiate_GRASS_session'. If sessions does
     #*    not exists, it creates it. If it exists, it opens it and load the files
     #* ---
 
     grassdata_path = get_path_for('grass_db',config)
+    grass_info['grassdata_path'] = grassdata_path
     location = grass_info['location']
     mapset = grass_info['mapset']
     CRS = grass_info['CRS']
@@ -96,7 +97,7 @@ def main(config_filename):
     if mapset_path.exists():
         subprocess.call(["rm", "-r", str(mapset_path)])
 
-    user = grutl.initiate_GRASS_sesion(str(grassdata_path), location, mapset, CRS_code=CRS)
+    user = grutl.initiate_GRASS_session(str(grassdata_path), location, mapset, CRS_code=CRS)
 
     #* ---
     #* 3. Add all the relevant rasters for the simulation.
@@ -170,28 +171,23 @@ def main(config_filename):
 
     itzi_output_path = get_path_for('itzi_output', config)
     output_itzi_file = itzi_output_path / 'itzi_config_file.ini'
-    grass_bin_path = grass_info['grass_bin_path']
-
-    end_time = grass_time['end_time']
-    record_step = grass_time['record_step']
-    duration = grass_time['duration']
-    dem = grass_input['dem'] or 'DEM_cropped'
-    friction = grass_input['friction'] or 'friction'
+    grass_input['dem'] = grass_input['dem'] or 'DEM_cropped'
+    grass_input['friction'] = grass_input['friction'] or 'friction'
     # tähän ehto jos constant tehdään niin kuin tehtiin start_h.tif:n kanssa ja muuten otetaan grass tietokanta.
-    rain = stds
+    grass_input['rain'] = stds
 
     start_y = grass_input['start_y']
     if not start_y:
-        start_y = ''
+        grass_input['start_y'] = ''
     inflow = grass_input['inflow']
     if not inflow:
-        inflow = ''
+        grass_input['inflow'] = ''
     bctype = grass_input['bctype']
     if not bctype:
-        bctype = ''
+        grass_input['bctype'] = ''
     bcval = grass_input['bcval']
     if not bcval:
-        bcval = ''
+        grass_input['bcval'] = ''
     
     infiltration = grass_input['infiltration']
     if not infiltration:
@@ -219,52 +215,32 @@ def main(config_filename):
 
             t.register(type = 'raster', input = inf_stds, file = str(infiltration_txt_file))
 
-            infiltration = inf_stds
+            grass_input['infiltration'] = inf_stds
 
         else:
-
-            infiltration = 'infiltration_0'
+            grass_input['infiltration'] = 'infiltration_0'
 
     # Add the start_h file
     start_h = grass_input['start_h']
-
     if not start_h:
         start_h = ''
     else:
         # Vaikuttaako tässä se, että alkukartta on cropattu?
         gcore.run_command('r.in.gdal', input = grassdata_path / start_h, output = start_h)
         start_h = Path(start_h).stem
+    grass_input['start_h'] = start_h
 
-    losses = grass_input['losses'] or 'losses'
+    grass_input['losses'] = grass_input['losses'] or 'losses'
+    grass_output['prefix'] = grass_output['prefix'] or f'{mapset}_itzi'
+    grass_statistics['stats_file'] = grass_statistics['stats_file'] or itzi_output_path / f'{mapset}_itzi.csv'
 
-    prefix = grass_output['prefix'] or f'{mapset}_itzi'
-
-    values = grass_output['values']
-
-    stats_file = grass_statistics['stats_file'] or itzi_output_path / f'{mapset}_itzi.csv'
-
-    hmin = grass_options['hmin']
-    slmax = grass_options['slmax']
-    cfl = grass_options['cfl']
-    theta = grass_options['theta']
-    vrouting = grass_options['vrouting']
-    dtmax = grass_options['dtmax']
-    dtinf = grass_options['dtinf']
-
-    grutl.create_itzi_config_file(output_itzi_file, record_step=record_step, dem=dem, friction=friction,
-                                grass_bin=grass_bin_path, grassdata=grassdata_path,
-                                location=location, mapset=mapset, start_time=start_time,
-                                end_time=end_time, duration=duration, start_h=start_h,start_y=start_y,
-                                rain=rain, inflow=inflow, bctype=bctype, bcval=bcval,
-                                infiltration=infiltration, losses=losses, prefix=prefix,
-                                values=values, stats_file=stats_file, hmin=hmin, slmax=slmax, cfl=cfl,
-                                theta=theta, vrouting=vrouting, dtmax=dtmax, dtinf=dtinf)
-
+    grutl.create_itzi_config_file(output_itzi_file, config)
+     
     #* ---
     #* 9. End the current grass session
     #* ---
 
-    grutl.end_GRASS_sesion(user)
+    grutl.end_GRASS_session(user)
 
     #* ---
     #* X. Run the simulation in the terminal:

@@ -5,9 +5,6 @@ import sys
 from configparser import ConfigParser
 from pathlib import Path
 
-
-
-
 def get_path_for(p: str, config) -> Path :
     """Helper function to get path settings from configuration (*_files parameters)
 

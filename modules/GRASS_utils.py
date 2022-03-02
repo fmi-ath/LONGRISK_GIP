@@ -13,7 +13,7 @@ from grass.pygrass.modules.shortcuts import raster as r
 from grass.pygrass.modules.shortcuts import vector as v
 from grass.pygrass.modules.shortcuts import temporal as t
 
-def initiate_GRASS_sesion(mygisdb, mylocation, mymapset, CRS_code = 4326):
+def initiate_GRASS_session(mygisdb, mylocation, mymapset, CRS_code = 4326):
 
     """Initiates a GRASS session with the given parameters.
 
@@ -51,7 +51,7 @@ def initiate_GRASS_sesion(mygisdb, mylocation, mymapset, CRS_code = 4326):
 
     return user
 
-def end_GRASS_sesion(session_name):
+def end_GRASS_session(session_name):
     """Ends the current GRASS session."""
     session_name.close()
 
@@ -179,29 +179,13 @@ def create_rain_raster_text_file(rain_raster_path, output_file, search_criteria 
     f.close()
 
 
-def create_itzi_config_file(output_file, record_step=None, dem=None, friction=None,
-                            # input
-                            start_h=None, start_y=None, rain=None,
-                            inflow=None, bctype=None, bcval=None, infiltration=None,
-                            effective_porosity=None, capillary_pressure=None,
-                            hydraulic_conductivity=None, losses=None, #dem, friction
-                            # output
-                            prefix=None, values=None,
-                            # time
-                            start_time=None, end_time=None, duration=None, #record_step
-                            # statistics
-                            stats_file=None,
-                            # options
-                            hmin=None, slmax=None, cfl=None, theta=None,
-                            vrouting=None, dtmax=None, dtinf=None,
-                            # drainage
-                            swmm_inp=None, output=None,
-                            orifice_coeff=None, free_weir_coeff=None, submerged_weir_coeff=None,
-                            # grass
-                            grass_bin=None, grassdata=None, location=None, mapset=None,
-                            region=None, mask=None,
-                            ):
+def create_itzi_config_file(output_file, config: dict): 
 
+
+    """
+    # grass
+    grass_bin=None, grassdata=None, location=None, mapset=None,
+    region=None, mask=None"""
     """Creates the .ini file needed for running itzi simulation according to parameters specified
     by user.
 
@@ -218,49 +202,42 @@ def create_itzi_config_file(output_file, record_step=None, dem=None, friction=No
     out : file
         Text file with parameters for itzi simnulation
     """
+    grass_info = config['grass_info']
+    grass_time = config['grass_time']
+    grass_input = config['grass_input']
+    grass_output = config['grass_output']
+    grass_options = config['grass_options']
+    drainage_kws = config['drainage']
 
-    if (record_step is None) or (dem is None) or (friction is None):
+    if (grass_time['record_step'] is None) or (grass_input['dem'] is None) or (grass_input['friction'] is None):
         raise ValueError('record_step, dem and friction are mandatory arguments for the simulation')
-
+    
+    effective_porosity=None
+    capillary_pressure=None
+    hydraulic_conductivity=None 
+    
     input_kws = {
-        'dem': dem,
-        'friction': friction,
-        'start_h': start_h,
-        'start_y': start_y,
-        'rain': rain,
-        'inflow': inflow,
-        'bctype': bctype,
-        'bcval': bcval,
-        'infiltration': infiltration,
+        'dem': grass_input['dem'],
+        'friction': grass_input['friction'],
+        'start_h': grass_input['start_h'],
+        'start_y': grass_input['start_y'],
+        'rain': grass_input['rain'],
+        'inflow': grass_input['inflow'],
+        'bctype': grass_input['bctype'],
+        'bcval': grass_input['bcval'],
+        'infiltration': grass_input['infiltration'],
         'effective_porosity': effective_porosity,
         'capillary_pressure': capillary_pressure,
         'hydraulic_conductivity': hydraulic_conductivity,
-        'losses': losses,
-    }
-
-    options_kws = {
-        'hmin': hmin,
-        'slmax': slmax,
-        'cfl': cfl,
-        'theta': theta,
-        'vrouting': vrouting,
-        'dtmax': dtmax,
-        'dtinf': dtinf,
-    }
-
-    drainage_kws = {
-        "swmm_inp": swmm_inp,
-        "output": output,
-        "orifice_coeff": orifice_coeff,
-        "free_weir_coeff": free_weir_coeff,
-        "submerged_weir_coeff": submerged_weir_coeff,
-    }
-
+        'losses': grass_input['losses'],
+    }    
+    region=None
+    mask=None
     grass_kws = {
-        "grass_bin": grass_bin,
-        "grassdata": grassdata,
-        "location": location,
-        "mapset": mapset,
+        "grass_bin": grass_info['grass_bin_path'],
+        "grassdata": grass_info['grassdata_path'],
+        "location": grass_info['location'],
+        "mapset": grass_info['mapset'],
         "region": region,
         "mask": mask,
     }
@@ -281,14 +258,14 @@ def create_itzi_config_file(output_file, record_step=None, dem=None, friction=No
     # end_time -- End of the simulation. Format yyyy-mm-dd HH:MM
     # duration -- Duration of the simulation. Format HH:MM:SS
     # record_step -- Duration between two records. Format HH:MM:SS
-    if (start_time is not None) and (end_time is not None):
-        config.set(secname, 'start_time', str(start_time))
-        config.set(secname, 'end_time', str(end_time))
-    elif (start_time is not None) and (duration is not None):
-        config.set(secname, 'start_time', str(start_time))
-        config.set(secname, 'duration', str(duration))
-    elif duration is not None:
-        config.set('time', 'duration', str(duration))
+    if (grass_time['start_time'] is not None) and (grass_time['end_time'] is not None):
+        config.set(secname, 'start_time', str(grass_time['start_time']))
+        config.set(secname, 'end_time', str(grass_time['end_time']))
+    elif (grass_time['start_time'] is not None) and (grass_time['duration'] is not None):
+        config.set(secname, 'start_time', str(grass_time['start_time']))
+        config.set(secname, 'duration', str(grass_time['duration']))
+    elif grass_time['duration'] is not None:
+        config.set('time', 'duration', str(grass_time['duration']))
     else:
         time_error_message = ('Possible combinations for time:\n'
                               '- start_time and end_time\n'
@@ -296,7 +273,7 @@ def create_itzi_config_file(output_file, record_step=None, dem=None, friction=No
                               '- duration only\n')
         raise ValueError(time_error_message)
 
-    config.set(secname, 'record_step', str(record_step))
+    config.set(secname, 'record_step', str(grass_time['record_step']))
 
     #? INPUT SECTION
     _insert_in_loop('input', input_kws)
@@ -304,17 +281,17 @@ def create_itzi_config_file(output_file, record_step=None, dem=None, friction=No
     #? OUTPUT SECTION
     secname = 'output'
     config.add_section(secname)
-    config.set(secname, 'prefix', str(prefix))
-    values = values if values is not None else []
+    config.set(secname, 'prefix', str(grass_output['prefix']))
+    values = grass_output['values'] if grass_output['values'] is not None else []
     config.set(secname, 'values', ', '.join(values))
 
     #? STATISTICS SECTION
     secname = 'statistics'
     config.add_section(secname)
-    config.set(secname, 'stats_file', str(stats_file))
+    config.set(secname, 'stats_file', str(config['grass_statistics']['stats_file']))
 
     #? OPTIONS SECTION
-    _insert_in_loop('options', options_kws)
+    _insert_in_loop('options', grass_options)
 
     #? DRAINAGE SECTION
     _insert_in_loop('drainage', drainage_kws)

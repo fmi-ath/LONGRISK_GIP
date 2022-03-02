@@ -245,3 +245,13 @@ water:
   y: 213
   # Value that is added to the points on collected by the floodfill method
   addon: 0.1
+
+drainage:
+  # This is left for future reference
+  swmm_inp:
+  output:
+  swmm_inp: 
+  output:
+  orifice_coeff:
+  free_weir_coeff:
+  submerged_weir_coeff:    
