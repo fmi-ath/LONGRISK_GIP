@@ -6,7 +6,7 @@ import rasterio as rio
 import rasterio.crs as crs
 from rasterio.transform import from_origin
 import osgeo
-
+import yaml
 # These tests have to be ran inside the Docker container 
 # where the app runs. Run run_docker.sh to achieve this.
 
