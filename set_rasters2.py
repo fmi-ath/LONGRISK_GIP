@@ -67,8 +67,6 @@ def create_config_dictionary_from_config_file(config_filename):
     return config
 
 def main(config_file_name):
-
-    
     #* ---
     #* We read the input information from the ini file and then the magic happens
     #* ---
@@ -87,7 +85,6 @@ def main(config_file_name):
     #* ---
     merge_is_used = config['merging']['DEM_merge_boolean']
     if merge_is_used:
-
         rasters_folder_path = get_path_for('DEM', config)
         merged_file_path = os.path.join(get_path_for('temporary', config), 'DEM_merged.tif')
 
@@ -99,7 +96,6 @@ def main(config_file_name):
         raster_to_crop_path = merged_file_path
 
     else:
-
         raster_to_crop_path = config['cropping']['DEM_file_path_to_crop']
 
     # If you would like to visualize it
@@ -115,7 +111,6 @@ def main(config_file_name):
     #* ---
     #* Cropping utilities
     #* ---
-
     crop_vector_file = config['cropping']['shapefile_file_path']
     crop_polygon_crs = config['cropping']['polygon_crs']
 
@@ -173,8 +168,6 @@ def main(config_file_name):
     #* 3.1. Here a map describing the water depth in the initial timestep is created so that 
     # it corresponds to the cropped DEM above or just the dem if it is not cropped.
     #* ---
-
-
     output_file_path = os.path.join(get_path_for('grass_db', config), 'start_h.tif')
     input_file_for_depth_and_constant_rain = dem_cropped_file_path if crop_is_used else (merged_file_path if merge_is_used else raster_to_crop_path)
     create_start_water_depth_file(input_file_for_depth_and_constant_rain, output_file_path, config)
@@ -182,7 +175,6 @@ def main(config_file_name):
     #* ---
     #* 4. Now we proceed to extract the rain rasters
     #* ---
-
     constant_rain_is_used = config['rain']['constant']
     if constant_rain_is_used:
         # create constant rain file
@@ -220,7 +212,6 @@ def main(config_file_name):
             rain_crop_search_criteria = config['rain']['rain_crop_search_criteria']
 
         elif ascii_files_path:
-
             print('\nRain data is in ascii format and its being converted to Tif format...\n')
 
             GTiff_files_path = os.path.join(get_path_for('temporary', config), 'rain')
@@ -230,15 +221,12 @@ def main(config_file_name):
                                 search_criteria=ascii_search_criteria, CRS_code=EPSG_code,
                                 xmax=xmax, xrotation=xrotation, xres=xres,
                                 yrotation=yrotation, ymin=ymin, yres=yres)
-
             print('\nDONE\n')
 
         else:
-
             raise ValueError('No rain data path provided')
 
-        if config['rain']['rain_relocation']: # BUG: Any string is True, not just "True"
-
+        if config['rain']['rain_relocation']:
             print('\nRain data is being relocated...\n')
 
             X_target = config['rain']['X_target']
@@ -259,19 +247,15 @@ def main(config_file_name):
         #* ---
         #* 5. Let's check if the rain rasters have same projection as raster of interest
         #* ---
-
         reference_file_path = os.path.join(get_path_for('grass_db', config), 'DEM_cropped.tif')
 
         if Path(GTiff_files_path).suffix == '':
             source_fname = next(glob.iglob(f"{GTiff_files_path}/*.tif"))  # we need only one file
             reproj = utl.raster_check_projection(source_fname, ref_fp = reference_file_path)
-
         else:
-
             reproj = utl.raster_check_projection(GTiff_files_path, ref_fp = reference_file_path)
 
         if reproj:
-
             root_reproj_rain_file = os.path.join(get_path_for('temporary', config), 'rain')
 
             print('\nRain file(s) being reprojected to match DEMs projection...\n')
@@ -281,7 +265,6 @@ def main(config_file_name):
             rain_crop_search_criteria = "*_reproj.tif"
 
         if config['rain']['rain_crop_boolean']:
-
             print('\nRain files are being cropped...\n')
 
             rain_cropped_file_path = os.path.join(get_path_for('grass_db', config), 'rain')
@@ -304,9 +287,7 @@ def main(config_file_name):
     #*     to reproject.
     #*    But if its for the first time, do it!
     #* ---
-
     if config['merging']['landcover_merge_boolean']:
-
         landcover_folder_path = config['merging']['landcover_file_path_to_merge']
         merged_file_path = os.path.join(get_path_for('temporary', config), 'landcover_merged.tif')
 
@@ -317,19 +298,14 @@ def main(config_file_name):
         utl.raster_merge(landcover_folder_path, merged_file_path, search_criteria=merge_search_criteria)
 
         landcover_to_crop_path = merged_file_path
-
     else:
-
         landcover_to_crop_path = config['cropping']['landcover_file_path_to_crop']
 
     # Let's check that the projection of the landcover map matches the projection of DEM map
-
     root_reproj_landcover_file = os.path.join(get_path_for('temporary', config), 'landcover_reproj.tif')
 
     reproj = utl.raster_check_projection(landcover_to_crop_path, ref_fp = dem_cropped_file_path)
-
     if reproj:
-
         print('\nReprojection needed for Landcover file to match DEM projection\n')
         utl.raster_reproject(landcover_to_crop_path, reproj_fp=root_reproj_landcover_file,
                             ref_fp=dem_cropped_file_path)
@@ -338,7 +314,6 @@ def main(config_file_name):
     #* ---
     #* 7. Let's crop the landcover file before extracting the information we need
     #* ---
-
     if config['cropping']['landcover_crop_boolean']:
         landcover_cropped_file_path = os.path.join(get_path_for('grass_db', config), 'landcover_cropped.tif')
         crop_search_criteria = config['cropping']['landcover_crop_search_criteria']
@@ -351,17 +326,12 @@ def main(config_file_name):
     #* ---
     #* 8. Now we intialize the Landcover class and extract friction, losses and infiltration
     #* ---
-
     landcover = LC.Landcover(landcover_cropped_file_path)
-
     landcover.get_friction()
-
     landcover.get_losses()
 
     if config['imperviousness']['imperviousness_file_boolean']:
-
         if config['merging']['imperviousness_merge_boolean']:
-
             imperviousness_folder_path = config['merging']['imperviousness_file_path_to_merge']
             merged_file_path = os.path.join(get_path_for('temporary', config), 'imperviousness_merged.tif')
 
@@ -373,9 +343,7 @@ def main(config_file_name):
                             search_criteria=merge_search_criteria)
 
             imperviousness_file_path = merged_file_path
-
         else:
-
             imperviousness_file_path = config['cropping']['imperviousness_file_path_to_crop']
 
         root_reproj_imperviousness_file = os.path.join(get_path_for('temporary', config), 'imperviousness_reproj.tif')
@@ -383,14 +351,12 @@ def main(config_file_name):
         reproj = utl.raster_check_projection(imperviousness_file_path, ref_fp=dem_cropped_file_path)
 
         if reproj:
-
             print('\nImperviousness file is being reprojected to match DEMs projection...\n')
             utl.raster_reproject(imperviousness_file_path, reproj_fp=root_reproj_imperviousness_file,
                                 ref_fp=dem_cropped_file_path)
             imperviousness_file_path = root_reproj_imperviousness_file
 
         if config['cropping']['imperviousness_crop_boolean']:
-
             imperviousness_cropped_file_path = os.path.join(get_path_for('grass_db', config),
                                                             'imperviousness_cropped.tif')
             crop_search_criteria = config['cropping']['imperviousness_crop_search_criteria']

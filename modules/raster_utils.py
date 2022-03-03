@@ -51,7 +51,6 @@ def _glob_path(search_path, search_criteria):
 def ascii_to_geotiff(ascii_files_path, GTiff_files_path, xmin, ymax, search_criteria='*.txt',
                      CRS_code=3067, xmax=None, xrotation=0, xres=None, yrotation=0, ymin=None,
                      yres=None):
-
     """A given ascii file(s) is(are) transformed into GeoTiff file.
 
         Parameters
@@ -146,7 +145,6 @@ def _process_ascii(fname, output_path, geotransform, projection_wkt):
 def rain_relocation(GTiff_files_path, xmin, ymax, X_target, Y_target, X_radar_rain,
                     Y_radar_rain, search_criteria ='*.txt', CRS_code=3067, xmax=None, xrotation=0,
                     xres=None, yrotation=0, ymin=None, yres=None):
-
     """Relocates a desired pixel region of the image (X_radar_rain, Y_radar_rain) to a desired
     region (X_target, Y_target). Produces a new GTiff file.
 
@@ -262,7 +260,6 @@ def rain_relocation(GTiff_files_path, xmin, ymax, X_target, Y_target, X_radar_ra
 
 
 def raster_check_projection(dst_fp, ref_fp = None, optional_crs = None):
-
     """Checks the projection of a given raster with respect to a reference raster or reference CRS.
 
         Parameters
@@ -280,7 +277,6 @@ def raster_check_projection(dst_fp, ref_fp = None, optional_crs = None):
         out : bool
             Boolean indicating if projection is different (True) or not (False)
     """
-
     message = '\n--> Files have same projection (no reprojection needed)'
     reproj = False
 
@@ -573,12 +569,9 @@ def vector_reproject(input_vector_file, reference_vector_file, output_file):
     output_file : str | Path
         Path of the new vector file reprojected.
     """
-
     geo1 = gpd.read_file(input_vector_file)
     geo2 = gpd.read_file(reference_vector_file)
-
     geo1_reproj  = geo1.to_crs(geo2.crs)
-
     geo1_reproj.to_file(output_file)
 
 
@@ -671,7 +664,6 @@ def set_raster_resolution(input_file, reference_file, output_file=None, binary=F
         out : file
             File with same path as input file but resolution changed according to reference file
     """
-
     in_array, _ = _load_gdal_raster(input_file)
     ref_array, ref_meta = _load_gdal_raster(reference_file)
 
@@ -685,113 +677,62 @@ def set_raster_resolution(input_file, reference_file, output_file=None, binary=F
 
     # Process raster heights
     if in_rows > ref_rows:
-
         ratio = floor(in_rows / ref_rows)
-
         j = 0
-
         if binary:
-
             for i in range(ref_rows):
-
                 data_rows = in_array[j:j + ratio]
-
                 if mask_value is not None:
-
                     data_rows = np.where(data_rows != mask_value, data_rows, 0)
-
                 for k in range(np.shape(data_rows)[1]):
-
                     new_array[i, k] = np.bincount(data_rows[:, k]).argmax()
-
                 j = i * ratio
-
         else:
-
             for i in range(ref_rows):
-
                 data_rows = in_array[j:j + ratio]
-
                 if mask_value is not None:
-
                     data_rows = np.where(data_rows != mask_value, data_rows, 0)
-
                 new_array[i] = np.mean(data_rows, axis = 0)
-
                 j = i * ratio
-
     elif in_rows < ref_rows:
-
         ratio = floor(ref_rows / in_rows)
-
         j = 0
-
         for i in range(ref_rows):
-
             new_array[j:j + ratio] = in_array[i]
-
             j = i * ratio
-
     # Process raster widths
     if in_cols > ref_cols:
-
         ratio = floor(in_cols / ref_cols)
-
         j = 0
-
         if binary:
-
             for i in range(ref_cols):
-
                 data_cols = in_array[:, j:j + ratio]
-
                 if mask_value is not None:
-
                     data_cols = np.where(data_cols != mask_value, data_cols, 0)
-
                 for k in range(np.shape(data_cols)[0]):
-
                     new_array[k, i] = np.bincount(data_cols[k, :]).argmax()
-
                 j = i * ratio
-
         else:
-
             for i in range(ref_cols):
-
                 data_cols = in_array[:, j:j + ratio]
-
                 if mask_value is not None:
-
                     data_cols = np.where(data_cols != mask_value, data_cols, 0)
-
                 new_array[:, i] = np.mean(data_cols, axis = 1)
-
                 j = i * ratio
-
     elif in_cols < ref_cols:
-
         ratio = floor(ref_cols / in_cols)
-
         j = 0
-
         for i in range(ref_cols):
-
             at = np.transpose(in_array)
             bt = np.transpose(new_array)
-
             #new_array[:, j:j + ratio] = in_array[:, i]
             bt[j:j + ratio] = at[i]
-
             new_array = np.transpose(bt)
-
             j = i * ratio
-
     new_array_2 = np.empty(ref_array.shape)
     new_array_2 = new_array[0:ref_rows, 0:ref_cols]
 
     if output_file is None:
-
         output_file = input_file
 
     # Write modified raster to file

@@ -1,15 +1,14 @@
 import os
 import subprocess
-from pathlib import Path
 import sys
-# import some convenient GRASS GIS Python API parts
+import yaml
+import modules.GRASS_utils as grutl
+from pathlib import Path
 from grass.script import core as gcore
-# import grass python libraries
 from grass.pygrass.modules.shortcuts import general as g
 from grass.pygrass.modules.shortcuts import raster as r
 from grass.pygrass.modules.shortcuts import temporal as t
-import modules.GRASS_utils as grutl
-import yaml
+
 
 def create_config_dictionary_from_config_file(config_filename):
     with open(config_filename) as file:
@@ -23,32 +22,20 @@ def ensure_folders_exist(config) -> None:
         if not p.suffix:
             p.mkdir(parents=True, exist_ok=True)
 
-def setup_start_h_file_if_specified(grass_input, grassdata_path):
+def setup_start_h_file_if_specified(start_h_filename, grassdata_path):
     # WARNING: this function changes state but is void
-    start_h_filename = grass_input['start_h']
     if not start_h_filename:
-        grass_input['start_h'] = ''
+        start_h_filename = ''
     else:
         gcore.run_command('r.in.gdal', input = grassdata_path / start_h_filename, output = start_h_filename)
-        grass_input['start_h'] = Path(start_h_filename).stem
+        start_h_filename = Path(start_h_filename).stem
+    return start_h_filename
 
-def main(config_filename):
-    #* ---
-    #* We read the input information from the ini file and then the magic happens
-    #* ---
-
-    config = create_config_dictionary_from_config_file(config_filename)
-    # parse existing file
-    grass_info = config['grass_info']
-    grass_time = config['grass_time']
-    grass_input = config['grass_input']
-
-    #* Create a rc file for grass if it doesn't exist yet
+def create_gisrc_file_for_grass_if_needed(grass_info):
     # If GISRC is set, assume valid path. Else default to grass's default: $HOME/.grass7/rc
     gisrc = os.environ.get('GISRC', None)
     if gisrc is None or not gisrc:
         raise RuntimeError('Environment variable GISRC is not set! Cannot run grass.')
-
     gisrc = Path(gisrc).expanduser().resolve()
 
     if not gisrc.exists():
@@ -61,6 +48,14 @@ def main(config_filename):
         with open(gisrc, 'w', encoding='utf-8') as f:
             f.write(rcstr)
 
+def main(config_filename):
+    config = create_config_dictionary_from_config_file(config_filename)
+    create_gisrc_file_for_grass_if_needed(config['grass_info'])
+
+    grass_info = config['grass_info']
+    grass_time = config['grass_time']
+    grass_input = config['grass_input']
+
     #* ---
     #* 1. We define the paths in which we would like to work out the simulation
     #*     - grass_db: str. Path of working location
@@ -70,7 +65,6 @@ def main(config_filename):
     #* 2. We initiate the grass session with 'initiate_GRASS_session'. If sessions does
     #*    not exists, it creates it. If it exists, it opens it and load the files
     #* ---
-
     grassdata_path = Path(config['grass_info']['grass_db'])
     grass_info['grassdata_path'] = grassdata_path
     mapset = grass_info['mapset']
@@ -87,9 +81,8 @@ def main(config_filename):
     #*    .tif file names but without the extension (i.e. input = Helsinki_cropped.tif,
     #*    output = Helsinki_cropped)
     #* ---
-
     rasters_path = Path(grassdata_path)
-
+    
     g.list(flags = 'p', type = 'raster')
 
     grutl.import_multiple_raster_files(rasters_path, search_criteria = '*.tif')
@@ -103,10 +96,11 @@ def main(config_filename):
     # If you would like to check the imported files
     g.list(flags = 'p', type = 'raster')
 
+    grass_input['start_h'] = setup_start_h_file_if_specified(grass_input['start_h'], grassdata_path)
+
     #* ---
     #* 5. Create time and space dataset with rain data required for the simulation.
     #* ---
-
     if config['rain']['constant']:
         stds = 'constant_rain.tif'
         gcore.run_command('r.in.gdal', input = grassdata_path / stds, output = stds)
@@ -119,7 +113,6 @@ def main(config_filename):
         #* ---
         #* 6. Import the minutely recorded radar rain events.
         #* ---
-
         rain_path = rasters_path / 'rain'
 
         grutl.import_multiple_raster_files(rain_path, search_criteria = '*.tif')
@@ -131,7 +124,6 @@ def main(config_filename):
         #*    As there are many files and the only way grass allows registering many files at once is with a
         #*    .txt file indicating the name of the files, we will first create the file and then register.
         #* ---
-
         rain_txt_file = rain_path / 'rain_registering_data.txt'
 
         grutl.create_rain_raster_text_file(rain_path, rain_txt_file, search_criteria='*.tif',
@@ -139,22 +131,13 @@ def main(config_filename):
                                         increment_unit=grass_time['increment_unit'])
 
         t.register(type = 'raster', input = stds, file = str(rain_txt_file))
-
-    #* ---
-    #* 8. We now create the izti configuration file to run the simulation. Here we set all the
-    #*    parameters we need and call the respective rasters and dataset we would like to use for the
-    #*    simulation. All the parameters must be strings.
-    #* ---
-
-    itzi_output_path = Path(config['folders']['itzi_output_files'])
-    output_itzi_file = itzi_output_path / 'itzi_config_file.ini'
-    # tähän ehto jos constant tehdään niin kuin tehtiin start_h.tif:n kanssa ja muuten otetaan grass tietokanta.
     grass_input['rain'] = stds
 
+    #* ---
+    #* 7.5. Here infiltration is set
+    #* ---
     if not grass_input['infiltration']:
-
         if config['rain']['infiltration_rate']:
-
             inf_stds = 'infiltration_minutely'
 
             t.create(output=inf_stds, semantictype='mean', title='Infiltration Rate',
@@ -177,15 +160,12 @@ def main(config_filename):
 
         else:
             grass_input['infiltration'] = 'infiltration_0'
-
-    setup_start_h_file_if_specified(grass_input, grassdata_path)
-
-    grutl.create_itzi_config_file(output_itzi_file, config)
-     
     #* ---
-    #* 9. End the current grass session
-    #* ---
-
+    #* 8. We now create the itzi configuration file to run the simulation. Here we set all the
+    #*    parameters we need and call the respective rasters and dataset we would like to use for the
+    #*    simulation.
+    #*    Then the GRASS session is finished
+    grutl.create_itzi_config_file(config)
     grutl.end_GRASS_session(user)
 
     #* ---
@@ -196,8 +176,8 @@ def main(config_filename):
     #* XI. Export the rasters of interest to GeoTiff file so that they can be analysed separately using:
     #*     'export_tif.py'
     #* ---
-
     print('\nGRASS has been set correctly. Ready to run itzi\n')
+
 
 if __name__ == '__main__':
     try:

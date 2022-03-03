@@ -9,12 +9,9 @@ from grass_session import Session
 from grass.script import core as gcore
 import grass.script as gscript
 from grass.pygrass.modules.shortcuts import general as g
-from grass.pygrass.modules.shortcuts import raster as r
-from grass.pygrass.modules.shortcuts import vector as v
 from grass.pygrass.modules.shortcuts import temporal as t
 
 def initiate_GRASS_session(mygisdb, mylocation, mymapset, CRS_code = 4326):
-
     """Initiates a GRASS session with the given parameters.
 
         Parameters
@@ -28,7 +25,6 @@ def initiate_GRASS_session(mygisdb, mylocation, mymapset, CRS_code = 4326):
         CRS_code : int | str
             Optional CRS for the current session.
     """
-
     crs_as_epsg = f'EPSG:{CRS_code}'
 
     os.environ.update(dict(GRASS_COMPRESS_NULLS = '1', GRASS_COMPRESSOR = 'ZSTD'))
@@ -56,7 +52,6 @@ def end_GRASS_session(session_name):
     session_name.close()
 
 def check_remove_existing_files(maps_remove = True, datasets_remove = True):
-
     """
     Based on:
     https://grass.osgeo.org/grass79/manuals/libpython/temporal_framework.html
@@ -70,7 +65,6 @@ def check_remove_existing_files(maps_remove = True, datasets_remove = True):
         datasets_remove: bool
             Boolean indicating if datasets (if any) are to be removed
     """
-
     print('\n Files to be deleted: \n\n')
 
     g.list(flags = 'p', type = 'all')
@@ -84,7 +78,6 @@ def check_remove_existing_files(maps_remove = True, datasets_remove = True):
         t.remove(flags = 'rf')
 
 def import_multiple_raster_files(path, search_criteria = '*.tif'):
-
     """Imports many rasters to the current GRASS session for a given search criteria.
 
         Parameters
@@ -94,7 +87,6 @@ def import_multiple_raster_files(path, search_criteria = '*.tif'):
         search_criteria : list or str
             List of criteria for searhing the rasters to be imported.
     """
-
     files_path = os.path.join(path, search_criteria)
 
     for name in glob.iglob(files_path):
@@ -103,7 +95,6 @@ def import_multiple_raster_files(path, search_criteria = '*.tif'):
 
 def create_rain_raster_text_file(rain_raster_path, output_file, search_criteria = '*.tif',
                                  start_time = None, increment_number = None, increment_unit = None):
-
     """Creates the text file needed for registering the rain rasters in the created space and time
     dataset for the simulation
 
@@ -127,7 +118,6 @@ def create_rain_raster_text_file(rain_raster_path, output_file, search_criteria 
         out : file
             Text file with rain raster names and time intervals if indicated
     """
-
     files_path = os.path.join(rain_raster_path, search_criteria)
 
     file_list = glob.glob(files_path)
@@ -139,9 +129,7 @@ def create_rain_raster_text_file(rain_raster_path, output_file, search_criteria 
     f = open(output_file, "w", encoding='utf-8')
 
     if start_time is None:
-
         for filename in file_list:
-
             _, tail = os.path.split(filename)
 
             #print(tail)
@@ -152,9 +140,7 @@ def create_rain_raster_text_file(rain_raster_path, output_file, search_criteria 
             f.write('\n')
 
     else:
-
         if not isinstance(start_time, datetime):
-
             start_time = datetime.strptime(start_time, "%Y-%m-%d %H:%M")
             print(f'The start_time was converted to datetime: {start_time:%Y-%m-%d %H:%M}')
 
@@ -164,7 +150,6 @@ def create_rain_raster_text_file(rain_raster_path, output_file, search_criteria 
         current_time = start_time
 
         for filename in sorted(file_list):
-
             _, tail = os.path.split(filename)
 
             #print(tail)
@@ -179,8 +164,7 @@ def create_rain_raster_text_file(rain_raster_path, output_file, search_criteria 
     f.close()
 
 
-def create_itzi_config_file(output_file, config_data: dict):
-
+def create_itzi_config_file(config_data: dict):
     """Creates the .ini file needed for running itzi simulation according to parameters specified
     by user.
 
@@ -189,8 +173,6 @@ def create_itzi_config_file(output_file, config_data: dict):
 
     Parameters
     ----------
-    output_file : str
-        Name of the output .ini file.
     config_data : dict
         config data from the config file. The data might have some modification effects given by set_GRASS.
     Returns
@@ -211,6 +193,9 @@ def create_itzi_config_file(output_file, config_data: dict):
     
     if (grass_time['record_step'] is None) or (grass_input['dem'] is None) or (grass_input['friction'] is None):
         raise ValueError('record_step, dem and friction are mandatory arguments for the simulation')
+    
+    itzi_output_path = Path(config_data['folders']['itzi_output_files'])
+    output_file = itzi_output_path / 'itzi_config_file.ini'
     
     if not grass_input['start_y']:
         grass_input['start_y'] = ''
@@ -322,7 +307,6 @@ def create_itzi_config_file(output_file, config_data: dict):
 
 #def GRASS_export_rasters(raster_path, output_path, search_criteria = '*'):
 def GRASS_export_rasters(output_path, mapset, search_criteria = '*'):
-
     """
     Based on:
     https://baharmon.github.io/python-in-grass
@@ -343,7 +327,6 @@ def GRASS_export_rasters(output_path, mapset, search_criteria = '*'):
         out : file
             Tiff files from itzi simulation
     """
-
     raster_list = gscript.list_grouped('rast', pattern = search_criteria)[mapset]
 
     for raster in raster_list:
