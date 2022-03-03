@@ -11,7 +11,7 @@ import grass.script as gscript
 from grass.pygrass.modules.shortcuts import general as g
 from grass.pygrass.modules.shortcuts import temporal as t
 
-def initiate_GRASS_session(mygisdb, mylocation, mymapset, CRS_code = 4326):
+def initiate_GRASS_session(grass_info):
     """Initiates a GRASS session with the given parameters.
 
         Parameters
@@ -25,6 +25,11 @@ def initiate_GRASS_session(mygisdb, mylocation, mymapset, CRS_code = 4326):
         CRS_code : int | str
             Optional CRS for the current session.
     """
+    mygisdb = grass_info['grass_db']
+    mylocation = grass_info['location']
+    mymapset = grass_info['mapset']
+    CRS_code = grass_info['CRS'] if grass_info['CRS'] else 4326
+
     crs_as_epsg = f'EPSG:{CRS_code}'
 
     os.environ.update(dict(GRASS_COMPRESS_NULLS = '1', GRASS_COMPRESSOR = 'ZSTD'))
@@ -240,7 +245,7 @@ def create_itzi_config_file(config_data: dict):
     mask=None
     grass_kws = {
         "grass_bin": grass_info['grass_bin_path'],
-        "grassdata": grass_info['grassdata_path'],
+        "grassdata": grass_info['grass_db'],
         "location": grass_info['location'],
         "mapset": grass_info['mapset'],
         "region": region,
