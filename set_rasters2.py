@@ -72,7 +72,6 @@ def main(config_file_name):
     #* ---
     #* We read the input information from the ini file and then the magic happens
     #* ---
-    
 
     # instantiate
     config = create_config_dictionary_from_config_file(config_file_name)

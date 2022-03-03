@@ -179,13 +179,8 @@ def create_rain_raster_text_file(rain_raster_path, output_file, search_criteria 
     f.close()
 
 
-def create_itzi_config_file(output_file, config_data: dict): 
+def create_itzi_config_file(output_file, config_data: dict):
 
-
-    """
-    # grass
-    grass_bin=None, grassdata=None, location=None, mapset=None,
-    region=None, mask=None"""
     """Creates the .ini file needed for running itzi simulation according to parameters specified
     by user.
 
@@ -196,7 +191,8 @@ def create_itzi_config_file(output_file, config_data: dict):
     ----------
     output_file : str
         Name of the output .ini file.
-
+    config_data : dict
+        config data from the config file. The data might have some modification effects given by set_GRASS.
     Returns
     -------
     out : file
@@ -210,9 +206,28 @@ def create_itzi_config_file(output_file, config_data: dict):
     drainage_kws = config_data['drainage']
     grass_statistics = config_data['grass_statistics']
 
+    grass_input['dem'] = grass_input['dem'] or 'DEM_cropped'
+    grass_input['friction'] = grass_input['friction'] or 'friction'
+    
     if (grass_time['record_step'] is None) or (grass_input['dem'] is None) or (grass_input['friction'] is None):
         raise ValueError('record_step, dem and friction are mandatory arguments for the simulation')
     
+    if not grass_input['start_y']:
+        grass_input['start_y'] = ''
+    if not grass_input['inflow']:
+        grass_input['inflow'] = ''
+    if not grass_input['bctype']:
+        grass_input['bctype'] = ''
+    if not grass_input['bcval']:
+        grass_input['bcval'] = ''
+    if not grass_statistics['stats_file']:
+        grass_statistics['stats_file'] = ''
+    grass_input['losses'] = grass_input['losses'] or 'losses'
+    mapset = grass_info['mapset']
+    itzi_output_path = Path(config_data['folders']['itzi_output_files'])
+    grass_output['prefix'] = grass_output['prefix'] or f'{mapset}_itzi'
+    grass_statistics['stats_file'] = grass_statistics['stats_file'] or itzi_output_path / f'{mapset}_itzi.csv'
+
     # These values are none as they lacked a value in the former version.
     effective_porosity=None
     capillary_pressure=None

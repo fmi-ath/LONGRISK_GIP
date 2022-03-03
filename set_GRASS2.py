@@ -1,18 +1,13 @@
 import os
-import statistics
 import subprocess
 from pathlib import Path
 import sys
 # import some convenient GRASS GIS Python API parts
 from grass.script import core as gcore
-import grass.script as gscript
-import grass.script.setup as gsetup
 # import grass python libraries
 from grass.pygrass.modules.shortcuts import general as g
 from grass.pygrass.modules.shortcuts import raster as r
-from grass.pygrass.modules.shortcuts import vector as v
 from grass.pygrass.modules.shortcuts import temporal as t
-
 import modules.GRASS_utils as grutl
 import yaml
 
@@ -21,29 +16,21 @@ def create_config_dictionary_from_config_file(config_filename):
         config = yaml.full_load(file)
     return config
 
-def get_path_for(p: str, config) -> Path :
-    """Helper function to get path settings from configuration (*_files parameters)
-
-    Example: if p=temporary, return value for temporary_files
-
-    Args:
-        p (str): tag for the configuration parameter (that ends with _files) or
-                 `mygisdb` or `grass_db` for GRASS database path
-
-    Returns:
-        Path: value from configuration file
-    """
-    if p in {'mygisdb', 'grass_db'}:
-        return Path(config['grass_info']['grass_db'])
-    path = config['folders'][f'{p}_files']
-    return Path(path)
-
 def ensure_folders_exist(config) -> None:
     """Create output folders if they don't exist"""
     for value in ('temporary', 'processed', 'itzi_output', 'grass_db'):
-        p = get_path_for(value, config)
+        p = Path(config['folders'][f'{value}_files'])
         if not p.suffix:
             p.mkdir(parents=True, exist_ok=True)
+
+def setup_start_h_file_if_specified(grass_input, grassdata_path):
+    # WARNING: this function changes state but is void
+    start_h_filename = grass_input['start_h']
+    if not start_h_filename:
+        grass_input['start_h'] = ''
+    else:
+        gcore.run_command('r.in.gdal', input = grassdata_path / start_h_filename, output = start_h_filename)
+        grass_input['start_h'] = Path(start_h_filename).stem
 
 def main(config_filename):
     #* ---
@@ -55,9 +42,6 @@ def main(config_filename):
     grass_info = config['grass_info']
     grass_time = config['grass_time']
     grass_input = config['grass_input']
-    grass_output = config['grass_output']
-    grass_statistics = config['grass_statistics']
-    grass_options = config['grass_options']
 
     #* Create a rc file for grass if it doesn't exist yet
     # If GISRC is set, assume valid path. Else default to grass's default: $HOME/.grass7/rc
@@ -87,18 +71,15 @@ def main(config_filename):
     #*    not exists, it creates it. If it exists, it opens it and load the files
     #* ---
 
-    grassdata_path = get_path_for('grass_db',config)
+    grassdata_path = Path(config['grass_info']['grass_db'])
     grass_info['grassdata_path'] = grassdata_path
-    location = grass_info['location']
     mapset = grass_info['mapset']
-    CRS = grass_info['CRS']
-
-    mapset_path = Path(os.path.join(grassdata_path, location, mapset))
+    mapset_path = Path(os.path.join(grassdata_path, grass_info['location'], mapset))
 
     if mapset_path.exists():
         subprocess.call(["rm", "-r", str(mapset_path)])
 
-    user = grutl.initiate_GRASS_session(str(grassdata_path), location, mapset, CRS_code=CRS)
+    user = grutl.initiate_GRASS_session(str(grassdata_path), grass_info['location'], mapset, CRS_code=grass_info['CRS'])
 
     #* ---
     #* 3. Add all the relevant rasters for the simulation.
@@ -126,8 +107,7 @@ def main(config_filename):
     #* 5. Create time and space dataset with rain data required for the simulation.
     #* ---
 
-    constant_rain_used = config['rain']['constant']
-    if constant_rain_used:
+    if config['rain']['constant']:
         stds = 'constant_rain.tif'
         gcore.run_command('r.in.gdal', input = grassdata_path / stds, output = stds)
         stds = Path(stds).stem
@@ -154,13 +134,9 @@ def main(config_filename):
 
         rain_txt_file = rain_path / 'rain_registering_data.txt'
 
-        start_time = grass_time['start_time']
-        increment_number = int(grass_time['increment_number'])
-        increment_unit = grass_time['increment_unit']
-
         grutl.create_rain_raster_text_file(rain_path, rain_txt_file, search_criteria='*.tif',
-                                        start_time=start_time, increment_number=increment_number,
-                                        increment_unit=increment_unit)
+                                        start_time=grass_time['start_time'], increment_number=int(grass_time['increment_number']),
+                                        increment_unit=grass_time['increment_unit'])
 
         t.register(type = 'raster', input = stds, file = str(rain_txt_file))
 
@@ -170,26 +146,12 @@ def main(config_filename):
     #*    simulation. All the parameters must be strings.
     #* ---
 
-    itzi_output_path = get_path_for('itzi_output', config)
+    itzi_output_path = Path(config['folders']['itzi_output_files'])
     output_itzi_file = itzi_output_path / 'itzi_config_file.ini'
-    grass_input['dem'] = grass_input['dem'] or 'DEM_cropped'
-    grass_input['friction'] = grass_input['friction'] or 'friction'
     # tähän ehto jos constant tehdään niin kuin tehtiin start_h.tif:n kanssa ja muuten otetaan grass tietokanta.
     grass_input['rain'] = stds
 
-    if not grass_input['start_y']:
-        grass_input['start_y'] = ''
-    if not grass_input['inflow']:
-        grass_input['inflow'] = ''
-    if not grass_input['bctype']:
-        grass_input['bctype'] = ''
-    if not grass_input['bcval']:
-        grass_input['bcval'] = ''
-    if not grass_statistics['stats_file']:
-        grass_statistics['stats_file'] = ''
-
-    infiltration = grass_input['infiltration']
-    if not infiltration:
+    if not grass_input['infiltration']:
 
         if config['rain']['infiltration_rate']:
 
@@ -203,14 +165,11 @@ def main(config_filename):
             grutl.import_multiple_raster_files(infiltration_path, search_criteria = '*.tif')
 
             infiltration_txt_file = infiltration_path / 'infiltration_registering_data.txt'
-            start_time = grass_time['start_time']
-            increment_number = int(grass_time['increment_number'])
-            increment_unit = grass_time['increment_unit']
 
             grutl.create_rain_raster_text_file(infiltration_path, infiltration_txt_file,
-                                            search_criteria='*.tif', start_time=start_time,
-                                            increment_number=increment_number,
-                                            increment_unit=increment_unit)
+                                            search_criteria='*.tif', start_time=grass_time['start_time'],
+                                            increment_number=int(grass_time['increment_number']),
+                                            increment_unit=grass_time['increment_unit'])
 
             t.register(type = 'raster', input = inf_stds, file = str(infiltration_txt_file))
 
@@ -219,19 +178,7 @@ def main(config_filename):
         else:
             grass_input['infiltration'] = 'infiltration_0'
 
-    # Add the start_h file
-    start_h = grass_input['start_h']
-    if not start_h:
-        start_h = ''
-    else:
-        # Vaikuttaako tässä se, että alkukartta on cropattu?
-        gcore.run_command('r.in.gdal', input = grassdata_path / start_h, output = start_h)
-        start_h = Path(start_h).stem
-    grass_input['start_h'] = start_h
-
-    grass_input['losses'] = grass_input['losses'] or 'losses'
-    grass_output['prefix'] = grass_output['prefix'] or f'{mapset}_itzi'
-    grass_statistics['stats_file'] = grass_statistics['stats_file'] or itzi_output_path / f'{mapset}_itzi.csv'
+    setup_start_h_file_if_specified(grass_input, grassdata_path)
 
     grutl.create_itzi_config_file(output_itzi_file, config)
      
