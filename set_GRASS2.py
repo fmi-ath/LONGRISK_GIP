@@ -53,7 +53,6 @@ def main(config_filename):
     create_gisrc_file_for_grass_if_needed(config['grass_info'])
 
     grass_info = config['grass_info']
-    grass_time = config['grass_time']
     grass_input = config['grass_input']
 
     #* ---
@@ -82,17 +81,13 @@ def main(config_filename):
     #*    output = Helsinki_cropped)
     #* ---
     rasters_path = Path(grassdata_path)
-    
     g.list(flags = 'p', type = 'raster')
-
     grutl.import_multiple_raster_files(rasters_path, search_criteria = '*.tif')
 
     # Set the region to match the raster of interest
     g.region(raster = f'DEM_cropped@{mapset}')
-
     # We would like to mask data that falls outside the boundaries for the simulation
     r.mask(raster = f'DEM_cropped@{mapset}')
-
     # If you would like to check the imported files
     g.list(flags = 'p', type = 'raster')
 
@@ -107,16 +102,13 @@ def main(config_filename):
         stds = Path(stds).stem
     else:
         stds = 'rain_minutely'
-
         t.create(output=stds, semantictype='mean', title='Rain Rate', description='Rain rate data for itzi')
 
         #* ---
         #* 6. Import the minutely recorded radar rain events.
         #* ---
         rain_path = rasters_path / 'rain'
-
         grutl.import_multiple_raster_files(rain_path, search_criteria = '*.tif')
-
         g.list(flags = 'p', type = 'raster')
 
         #* ---
@@ -125,12 +117,9 @@ def main(config_filename):
         #*    .txt file indicating the name of the files, we will first create the file and then register.
         #* ---
         rain_txt_file = rain_path / 'rain_registering_data.txt'
-
-        grutl.create_rain_raster_text_file(rain_path, rain_txt_file, search_criteria='*.tif',
-                                        start_time=grass_time['start_time'], increment_number=int(grass_time['increment_number']),
-                                        increment_unit=grass_time['increment_unit'])
-
+        grutl.create_rain_raster_text_file(rain_path, rain_txt_file, config['grass_time'], search_criteria='*.tif')
         t.register(type = 'raster', input = stds, file = str(rain_txt_file))
+
     grass_input['rain'] = stds
 
     #* ---
@@ -149,10 +138,7 @@ def main(config_filename):
 
             infiltration_txt_file = infiltration_path / 'infiltration_registering_data.txt'
 
-            grutl.create_rain_raster_text_file(infiltration_path, infiltration_txt_file,
-                                            search_criteria='*.tif', start_time=grass_time['start_time'],
-                                            increment_number=int(grass_time['increment_number']),
-                                            increment_unit=grass_time['increment_unit'])
+            grutl.create_rain_raster_text_file(infiltration_path, infiltration_txt_file, config['grass_time'], search_criteria='*.tif')
 
             t.register(type = 'raster', input = inf_stds, file = str(infiltration_txt_file))
 
@@ -167,15 +153,6 @@ def main(config_filename):
     #*    Then the GRASS session is finished
     grutl.create_itzi_config_file(config)
     grutl.end_GRASS_session(user)
-
-    #* ---
-    #* X. Run the simulation in the terminal:
-    #*
-    #*     $ itzi run output_itzi_file
-    #*
-    #* XI. Export the rasters of interest to GeoTiff file so that they can be analysed separately using:
-    #*     'export_tif.py'
-    #* ---
     print('\nGRASS has been set correctly. Ready to run itzi\n')
 
 

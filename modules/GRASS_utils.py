@@ -93,8 +93,7 @@ def import_multiple_raster_files(path, search_criteria = '*.tif'):
         gcore.run_command('r.in.gdal', input = name, output = Path(name).stem)
 
 
-def create_rain_raster_text_file(rain_raster_path, output_file, search_criteria = '*.tif',
-                                 start_time = None, increment_number = None, increment_unit = None):
+def create_rain_raster_text_file(rain_raster_path, output_file, grass_time, search_criteria = '*.tif'):
     """Creates the text file needed for registering the rain rasters in the created space and time
     dataset for the simulation
 
@@ -118,6 +117,10 @@ def create_rain_raster_text_file(rain_raster_path, output_file, search_criteria 
         out : file
             Text file with rain raster names and time intervals if indicated
     """
+    start_time=grass_time['start_time'] if grass_time['start_time'] else None
+    increment_number=int(grass_time['increment_number']) if grass_time['increment_number'] else None
+    increment_unit=grass_time['increment_unit']  if grass_time['increment_unit'] else None
+
     files_path = os.path.join(rain_raster_path, search_criteria)
 
     file_list = glob.glob(files_path)
