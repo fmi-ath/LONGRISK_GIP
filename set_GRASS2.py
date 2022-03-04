@@ -1,6 +1,5 @@
 import os, subprocess, sys
-import modules.GRASS_utils as grutl
-import modules.common as cm
+import modules.GRASS_utils as grutl, modules.common as cm
 from pathlib import Path
 from grass.script import core as gcore
 from grass.pygrass.modules.shortcuts import general as g, raster as r, temporal as t
@@ -66,15 +65,12 @@ def set_up_rain(config):
         stds = 'constant_rain.tif'
         gcore.run_command('r.in.gdal', input = Path(config['grass_info']['grass_db']) / stds, output = stds)
         return Path(stds).stem
-    
     stds = 'rain_minutely'
     t.create(output=stds, semantictype='mean', title='Rain Rate', description='Rain rate data for itzi')
-
     #* 4.1. Import the minutely recorded radar rain events.
     rain_path = Path(config['grass_info']['grass_db']) / 'rain'
     grutl.import_multiple_raster_files(rain_path)
     g.list(flags = 'p', type = 'raster')
-
     #* 4.2. Register the minutely rain radar data in the time and space dataset created previously.
     #*    As there are many files and the only way grass allows registering many files at once is with a
     #*    .txt file indicating the name of the files, we will first create the file and then register.
@@ -86,7 +82,6 @@ def set_up_rain(config):
 def main(config_filename):
     config = cm.create_config_dictionary_from_config_file(config_filename)
     create_gisrc_file_for_grass_if_needed(config['grass_info'])
-
     #* 1. We define the paths in which we would like to work out the simulation
     #*     - grass_db: str. Path of working location
     #*     - location: str. Name of the location (Ex. Helsinki)
@@ -95,19 +90,15 @@ def main(config_filename):
     #*    not exists, it creates it. If it exists, it opens it and load the files
     set_up_mapset_path(config['grass_info'])
     user = grutl.initiate_GRASS_session(config['grass_info'])
-
     #* 3. Add all the relevant rasters for the simulation.
     #*    For conviniency, the name of the rasters in GRASS will be the same as the
     #*    .tif file names but without the extension (i.e. input = Helsinki_cropped.tif,
     #*    output = Helsinki_cropped)
     add_all_relevant_rasters_to_grass(config)
-
     #* 4. Create time and space dataset with rain data required for the simulation.
     config['grass_input']['rain'] = set_up_rain(config)
-
     #* 5. Here infiltration is set up for grass
     set_up_infiltration(config)
-    
     #* 6. We now create the itzi configuration file to run the simulation. Here we set all the
     #*    parameters we need and call the respective rasters and dataset we would like to use for the
     #*    simulation.

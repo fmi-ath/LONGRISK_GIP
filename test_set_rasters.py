@@ -63,20 +63,6 @@ class test_set_rasters(unittest.TestCase):
             for column in range(len(test_raster[row])):
                 self.assertEqual(test_raster[row][column], true_raster[row][column])
 
-    def test_open_dem_file_array(self):
-        dem_data_array = sr.read_dem_file_array(test_set_rasters.dem_location)
-        self.assert_equal_two_rasters(dem_data_array, self.mock_raster)
-
-    def test_open_dem_file_metadata(self):
-        correct_dem_metadata = {'driver': 'GTiff', 'dtype': 'float32', 'nodata': -9999.0,
-                                'width': 10, 'height': 21, 'count': 1, 'crs': crs.CRS.from_epsg(3067),
-                                'transform': rio.Affine(2.0, 0.0, 362000.0,0.0, -2.0, 6672000.0)}
-        dem_metadata = sr.read_dem_file_metadata(test_set_rasters.dem_location)
-        self.assertEqual(dem_metadata, correct_dem_metadata)
-
-    def test_add_missing_subfolders(self):
-        self.assertEqual(sr.add_missing_subfolders(self.test_config_dict), 1)
-
 
 if __name__ == '__main__':
     unittest.main()

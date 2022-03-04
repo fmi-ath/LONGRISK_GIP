@@ -1,6 +1,4 @@
-import os
-import glob
-import json
+import os, glob, json
 import concurrent.futures
 from math import floor
 from pathlib import Path
@@ -34,15 +32,12 @@ def _glob_path(search_path, search_criteria):
     """
     if Path(search_path).suffix == '':
         search_criteria = _ensure_list(search_criteria)
-
         path = []
-
         for hints in search_criteria:
             # Make a search criteria to select the DEM files
             q = os.path.join(search_path, hints)
             # glob function can be used to list files from a directory with specific criteria
             path.extend(glob.glob(q))
-
     else:
         path = glob.glob(search_path)
 
@@ -407,7 +402,6 @@ def raster_merge(rasters_folder_path, merged_file_path, search_criteria = "L*.ti
         out : file
             Merged file
     """
-
     # File and folder paths
     out_fp = os.path.join(merged_file_path)
 
@@ -519,12 +513,7 @@ def raster_crop(raster_to_crop_path, cropped_file_path = None, search_criteria =
 
         # Project the Polygon into same CRS as the grid
         geo = geo.to_crs(crs = data.crs.data)
-
-        # Print crs
-        #print(geo.crs)
-
         coords = getFeatures(geo)
-        #print(coords)
 
         # Clip the raster with Polygon
         out_img, out_transform = mask(dataset=data, shapes=coords, crop=True,
@@ -532,13 +521,6 @@ def raster_crop(raster_to_crop_path, cropped_file_path = None, search_criteria =
 
         # Copy the metadata
         out_meta = data.meta.copy()  # pylint: disable=no-member
-        #print(out_meta)
-
-        # Parse EPSG code
-        #print(data.crs.data)
-        # epsg_code = int(data.crs.data['init'][5:]) # pylint: disable=no-member
-        #print(epsg_code)
-
         out_meta.update({"driver": "GTiff",
                          "height": out_img.shape[1],
                          "width": out_img.shape[2],
@@ -576,7 +558,6 @@ def vector_reproject(input_vector_file, reference_vector_file, output_file):
 
 
 def vector_intersection(vector_file_1, vector_file_2, output_file):
-
     """
     Based on:
     https://autogis-site.readthedocs.io/en/latest/notebooks/L4/geometric-operations.html
@@ -598,7 +579,6 @@ def vector_intersection(vector_file_1, vector_file_2, output_file):
         out : file
             Intersected file
     """
-
     geo1 = gpd.read_file(vector_file_1)
     geo2 = gpd.read_file(vector_file_2)
 
@@ -611,7 +591,6 @@ def vector_intersection(vector_file_1, vector_file_2, output_file):
         geo2 = gpd.read_file(reproj_file)
 
     intersection = gpd.overlay(geo1, geo2, how = 'intersection')
-
     intersection.to_file(output_file)
 
 
