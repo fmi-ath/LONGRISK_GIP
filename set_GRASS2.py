@@ -13,7 +13,6 @@ def set_up_start_h_file_if_specified(config):
     return Path(start_h).stem
 
 def create_gisrc_file_for_grass_if_needed(grass_info):
-    # If GISRC is set, assume valid path. Else default to grass's default: $HOME/.grass7/rc
     gisrc = os.environ.get('GISRC', None)
     if gisrc is None or not gisrc:
         raise RuntimeError('Environment variable GISRC is not set! Cannot run grass.')
