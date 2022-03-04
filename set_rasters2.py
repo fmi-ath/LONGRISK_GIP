@@ -40,31 +40,15 @@ def main(config_file_name):
     #*    shapefile.
     #*
     #*    If vector file not given, then both polygon coordinates and crs MUST be given
-    x_coords = config['cropping']['x_polygon_coords']
-    y_coords = config['cropping']['y_polygon_coords']
-    if x_coords and y_coords:
-        crop_polygon_coords = list(zip(x_coords, y_coords))
-    else:
-        crop_polygon_coords = None
-
-    null_value = config['cropping']['mask_value'] if config['cropping']['mask_value'] else -9999.
     crop_is_used = config['cropping']['DEM_crop_boolean']
     if crop_is_used:
         dem_cropped_file_path = os.path.join(config['grass_info']['grass_db'], 'DEM_cropped.tif')
-        utl.raster_crop(raster_to_crop_path,
-                        cropped_file_path=dem_cropped_file_path,
-                        search_criteria=config['cropping']['DEM_crop_search_criteria'],
-                        vector_file=config['cropping']['shapefile_file_path'],
-                        polygon_coords=crop_polygon_coords,
-                        polygon_crs=config['cropping']['polygon_crs'],
-                        mask_value=null_value,
-                        mask_all_touched=True
-                    )
+        utl.raster_crop(raster_to_crop_path, config['cropping'],cropped_file_path=dem_cropped_file_path,
+                        search_criteria=config['cropping']['DEM_crop_search_criteria'])
     #* 3.1. Here a map describing the water depth in the initial timestep is created so that 
     # it corresponds to the cropped DEM above or just the dem if it is not cropped.
-    output_file_path = os.path.join(config['grass_info']['grass_db'], 'start_h.tif')
     input_file_for_depth_and_constant_rain = dem_cropped_file_path if crop_is_used else (merged_file_path if merge_is_used else raster_to_crop_path)
-    create_start_water_depth_file(input_file_for_depth_and_constant_rain, output_file_path, config)
+    create_start_water_depth_file(input_file_for_depth_and_constant_rain, os.path.join(config['grass_info']['grass_db'], 'start_h.tif'), config)
     #* 4. Now we proceed to extract the rain rasters
     if config['rain']['constant']:
         # create constant rain file
@@ -79,22 +63,15 @@ def main(config_file_name):
             rain_crop_search_criteria = config['rain']['rain_crop_search_criteria']
         elif config['rain']['ascii_files_path']:
             print('\nRain data is in ascii format and its being converted to Tif format...\n')
-            GTiff_files_path = os.path.join(config['folders']['temporary_files'], 'rain')
-            utl.ascii_to_geotiff(config['rain']['ascii_files_path'], GTiff_files_path, config['rain']['x_min'], config['rain']['y_max'],
-                                search_criteria=config['rain']['ascii_search_criteria'], CRS_code=config['rain']['EPSG_code'],
-                                xmax=config['rain']['x_max'], xrotation=config['rain']['x_rotation'], xres=config['rain']['x_res'],
-                                yrotation=config['rain']['y_rotation'], ymin=config['rain']['y_min'], yres=config['rain']['y_res'])
+            GTiff_files_path = config['folders']['temporary_files']+'/rain'
+            utl.ascii_to_geotiff(GTiff_files_path, config['rain'])
             print('\nDONE\n')
         else:
             raise ValueError('No rain data path provided')
 
         if config['rain']['rain_relocation']:
             print('\nRain data is being relocated...\n')
-            utl.rain_relocation(GTiff_files_path, config['rain']['x_min'], config['rain']['y_max'], config['rain']['X_target'], config['rain']['Y_target'], config['rain']['X_radar_rain'],
-                                config['rain']['Y_radar_rain'], search_criteria=config['rain']['relocation_search_criteria'],CRS_code=config['rain']['EPSG_code'],
-                                xmax=config['rain']['x_max'], xrotation=config['rain']['x_rotation'], xres=config['rain']['x_res'],
-                                yrotation=config['rain']['y_rotation'], ymin=config['rain']['y_min'], yres=config['rain']['y_res'])
-
+            utl.rain_relocation(GTiff_files_path, config['rain'])
             rain_crop_search_criteria = '*_relocated.tif'
 
         print('\nDONE\n')
@@ -108,23 +85,16 @@ def main(config_file_name):
 
         if reproj:
             root_reproj_rain_file = os.path.join(config['folders']['temporary_files'], 'rain')
-
             print('\nRain file(s) being reprojected to match DEMs projection...\n')
             utl.raster_reproject(GTiff_files_path, reproj_fp=root_reproj_rain_file,
                                 ref_fp=reference_file_path, search_criteria=rain_crop_search_criteria)
-
             rain_crop_search_criteria = "*_reproj.tif"
 
         if config['rain']['rain_crop_boolean']:
             print('\nRain files are being cropped...\n')
-
             rain_cropped_file_path = os.path.join(config['grass_info']['grass_db'], 'rain')
-
-            utl.raster_crop(GTiff_files_path, cropped_file_path=rain_cropped_file_path,
-                            search_criteria=rain_crop_search_criteria, vector_file=config['cropping']['shapefile_file_path'],
-                            polygon_coords=crop_polygon_coords, polygon_crs=config['cropping']['polygon_crs'],
-                            mask_value=null_value, mask_all_touched=True)
-
+            utl.raster_crop(GTiff_files_path, config['cropping'], cropped_file_path=rain_cropped_file_path,
+                            search_criteria=rain_crop_search_criteria)
             print('\nDONE\n')
     #* 6. We now turn to landuse information to define: friction, losses and infiltration.
     #*    Landuse information for Finland downloaded from:
@@ -139,7 +109,6 @@ def main(config_file_name):
         landcover_folder_path = config['merging']['landcover_file_path_to_merge']
         merged_file_path = os.path.join(config['folders']['temporary_files'], 'landcover_merged.tif')
         utl.raster_merge(landcover_folder_path, merged_file_path, search_criteria=config['merging']['landcover_merge_search_criteria'])
-
         landcover_to_crop_path = merged_file_path
     else:
         landcover_to_crop_path = config['cropping']['landcover_file_path_to_crop']
@@ -153,10 +122,8 @@ def main(config_file_name):
     #* 7. Let's crop the landcover file before extracting the information we need
     if config['cropping']['landcover_crop_boolean']:
         landcover_cropped_file_path = os.path.join(config['grass_info']['grass_db'], 'landcover_cropped.tif')
-        utl.raster_crop(landcover_to_crop_path, cropped_file_path=landcover_cropped_file_path,
-                        search_criteria=config['cropping']['landcover_crop_search_criteria'], vector_file=config['cropping']['shapefile_file_path'],
-                        polygon_coords=crop_polygon_coords, polygon_crs=config['cropping']['polygon_crs'],
-                        mask_value=null_value, mask_all_touched=True)
+        utl.raster_crop(landcover_to_crop_path, config['cropping'], cropped_file_path=landcover_cropped_file_path,
+                        search_criteria=config['cropping']['landcover_crop_search_criteria'])
     #* 8. Now we intialize the Landcover class and extract friction, losses and infiltration
     landcover = LC.Landcover(landcover_cropped_file_path)
     landcover.get_friction()
@@ -180,15 +147,12 @@ def main(config_file_name):
 
         if config['cropping']['imperviousness_crop_boolean']:
             imperviousness_cropped_file_path = os.path.join(config['grass_info']['grass_db'], 'imperviousness_cropped.tif')
-            utl.raster_crop(imperviousness_file_path,cropped_file_path=imperviousness_cropped_file_path,
-                            search_criteria=config['cropping']['imperviousness_crop_search_criteria'], vector_file=config['cropping']['shapefile_file_path'],
-                            polygon_coords=crop_polygon_coords, polygon_crs=config['cropping']['polygon_crs'],
-                            mask_value=null_value, mask_all_touched=True)
+            utl.raster_crop(imperviousness_file_path,config['cropping'],cropped_file_path=imperviousness_cropped_file_path,
+                            search_criteria=config['cropping']['imperviousness_crop_search_criteria'])
 
             imperviousness_file_path = imperviousness_cropped_file_path
 
-            utl.set_raster_resolution(imperviousness_file_path, landcover_cropped_file_path,
-                                    binary=False, mask_value=241)
+            utl.set_raster_resolution(imperviousness_file_path, landcover_cropped_file_path, binary=False, mask_value=241)
 
         if config['rain']['infiltration_rate']:
             infiltration_output_path = os.path.join(config['grass_info']['grass_db'], 'infiltration')
@@ -196,8 +160,7 @@ def main(config_file_name):
             infiltration_output_path = config['grass_info']['grass_db']
 
         landcover.get_infiltration(imperviousness_file_path, os.path.join(config['grass_info']['grass_db'], 'rain'),
-                                output_folder=infiltration_output_path,
-                                infiltration_rate=config['rain']['infiltration_rate'])
+                                output_folder=infiltration_output_path, infiltration_rate=config['rain']['infiltration_rate'])
 
     print('\nDONE with DEM, LANDCOVER and RAIN rasters\n')
 

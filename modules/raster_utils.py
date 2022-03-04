@@ -43,44 +43,31 @@ def _glob_path(search_path, search_criteria):
 
     return path
 
-def ascii_to_geotiff(ascii_files_path, GTiff_files_path, xmin, ymax, search_criteria='*.txt',
-                     CRS_code=3067, xmax=None, xrotation=0, xres=None, yrotation=0, ymin=None,
-                     yres=None):
+def ascii_to_geotiff(GTiff_files_path, config):
     """A given ascii file(s) is(are) transformed into GeoTiff file.
 
         Parameters
         ----------
-        ascii_files_path : str
-            Path to ascii file(s).
-        GTiff_files_path : str
-            Path where GTiff files will be located.
-        xmin : float
-            X coordinate of upper-left corner of the image
-        ymax : float
-            Y coordinate of upper-left corner of the image
-        search_criteria : list or str
-            List of criteria for searhing the ascii files to be converted.
-        CRS_code : into
-            EPSG code for which the coordinates are stablished
-        xmax : float
-            X coordinate of lower-right corner of the image
-        ymin : float
-            Y coordinate of lower-right corner of the image
-        xres : float
-            X resolution of the image
-        yres : float
-            Y resolution of the image
-        xrotation : float
-            X rotation of the image
-        yrotation : float
-            Y rotation of the image
-
+        config : dictionary containing rain section from the config file
 
         Returns
         -------
         out : file
             GTiff converted file
     """
+    ascii_files_path = config['ascii_files_path']
+    xmin = config['x_min']
+    ymax = config['y_max']
+    search_criteria = config['ascii_search_criteria'] if config['ascii_search_criteria'] else '*.txt'
+    CRS_code = config['EPSG_code'] if config['EPSG_code'] else 3067
+    xmax = config['x_max']
+    xrotation = config['x_rotation'] if config['x_rotation'] else 0
+    xres = config['x_res']
+    yrotation= config['y_rotation'] if config['y_rotation'] else 0
+    ymin=config['y_min']
+    yres=config['y_res']
+
+
     if xres is None and xmax is None:
         raise ValueError("If 'xres' not given, 'xmax' has to be given")
 
@@ -137,9 +124,7 @@ def _process_ascii(fname, output_path, geotransform, projection_wkt):
     output_raster.FlushCache()
     output_raster = None
 
-def rain_relocation(GTiff_files_path, xmin, ymax, X_target, Y_target, X_radar_rain,
-                    Y_radar_rain, search_criteria ='*.txt', CRS_code=3067, xmax=None, xrotation=0,
-                    xres=None, yrotation=0, ymin=None, yres=None):
+def rain_relocation(GTiff_files_path, config):
     """Relocates a desired pixel region of the image (X_radar_rain, Y_radar_rain) to a desired
     region (X_target, Y_target). Produces a new GTiff file.
 
@@ -147,34 +132,7 @@ def rain_relocation(GTiff_files_path, xmin, ymax, X_target, Y_target, X_radar_ra
         ----------
         GTiff_files_path : str
             Path where GTiff files will be located.
-        xmin : float
-            X coordinate of upper-left corner of the image
-        ymax : float
-            Y coordinate of upper-left corner of the image
-        X_target : float
-            X coordinate of region over which rain pixels will be positioned
-        Y_target : float
-            Y coordinate of region over which rain pixels will be positioned
-        X_radar_rain : float
-            X distance between rain pixels and radar (center of the image)
-        Y_radar_rain : float
-            Y distance between rain pixels and radar (center of the image)
-        search_criteria : list or str
-            List of criteria for searhing the ascii files to be converted.
-        CRS_code : into
-            EPSG code for which the coordinates are stablished
-        xmax : float
-            X coordinate of lower-right corner of the image
-        ymin : float
-            Y coordinate of lower-right corner of the image
-        xres : float
-            X resolution of the image
-        yres : float
-            Y resolution of the image
-        xrotation : float
-            X rotation of the image
-        yrotation : float
-            Y rotation of the image
+        config : dictionary of the rain parameters from the config file.
 
 
         Returns
@@ -182,6 +140,21 @@ def rain_relocation(GTiff_files_path, xmin, ymax, X_target, Y_target, X_radar_ra
         out : file
             GTiff relocated file
     """
+    xmin = config['x_min']
+    ymax = config['y_max']
+    X_target = config['X_target']
+    Y_target = config['Y_target']
+    X_radar_rain = config['X_radar_rain']
+    Y_radar_rain = config['Y_radar_rain']
+    search_criteria = config['relocation_search_criteria'] if config['relocation_search_criteria'] else '*.txt'
+    CRS_code = config['EPSG_code'] if config['EPSG_code'] else 3067
+    xmax=config['x_max']
+    xrotation= config['x_rotation'] if config['x_rotation'] else 0
+    xres=config['x_res']
+    yrotation= config['y_rotation'] if config['y_rotation'] else 0
+    ymin=config['y_min']
+    yres=config['y_res']
+
     if xres is None and xmax is None:
         raise ValueError('If xres not given, xmax has to be given')
     if yres is None and ymin is None:
@@ -277,10 +250,8 @@ def raster_check_projection(dst_fp, ref_fp = None, optional_crs = None):
 
     if ref_fp is not None:
         m = f' and (reference file) {Path(ref_fp).name}'
-
     elif optional_crs is not None:
         m = f' and (reference CRS) {optional_crs}'
-
     else: # ref_fp is None and optional_crs is None
         raise ValueError('Indicate either a reference file or optional crs to compare projection')
 
@@ -353,7 +324,6 @@ def raster_reproject(dst_fp, reproj_fp=None, ref_fp=None, optional_crs=None,
             output_fp = reproj_fp
 
         with rasterio.open(input_file) as src:
-
             if ref_crs == src.crs:
                 continue
 
@@ -408,8 +378,6 @@ def raster_merge(rasters_folder_path, merged_file_path, search_criteria = "L*.ti
     # Remove any suffix to replicate pre-refactoring behaviour here
     path_no_suffix = Path(rasters_folder_path).with_suffix('')
     dem_fps = _glob_path(path_no_suffix, search_criteria)
-    # Files that were found:
-    #print(dem_fps)
 
     # List for the source files
     src_files_to_mosaic = []
@@ -419,15 +387,11 @@ def raster_merge(rasters_folder_path, merged_file_path, search_criteria = "L*.ti
         src = rasterio.open(fp)
         src_files_to_mosaic.append(src)
 
-    #print(src_files_to_mosaic)
-
     # Merge function returns a single mosaic array and the transformation info
     mosaic, out_trans = merge(src_files_to_mosaic)
 
     # Copy the metadata
     out_meta = src.meta.copy()
-
-    #print(src.meta['crs'])
 
     # Update the metadata
     out_meta.update({
@@ -451,10 +415,7 @@ def getFeatures(gdf):
     return [json.loads(gdf.to_json())['features'][0]['geometry']]
 
 
-def raster_crop(raster_to_crop_path, cropped_file_path = None, search_criteria = "*.tif",
-                vector_file = None, polygon_coords = None, polygon_crs = None, mask_value = -9999.,
-                mask_all_touched = False):
-
+def raster_crop(raster_to_crop_path, config, cropped_file_path = None, search_criteria = "*.tif"):
     """Crop a raster or set of rasters according to shapefile or Polygon.
 
     Based on:
@@ -489,14 +450,23 @@ def raster_crop(raster_to_crop_path, cropped_file_path = None, search_criteria =
         crs reference system of the form "EPSG:XXXX"
         polygon_crs = XXXX
     """
+    vector_file=config['shapefile_file_path']
+    x_coords=config['x_polygon_coords']
+    y_coords=config['y_polygon_coords']
+    polygon_crs=config['polygon_crs']
+    mask_value=config['mask_value'] if config['mask_value'] else -9999.
+    mask_all_touched=True
+
+    if x_coords and y_coords:
+        polygon_coords = list(zip(x_coords, y_coords))
+    else:
+        polygon_coords = None
 
     if vector_file is not None:
         geo = gpd.read_file(vector_file)
-
     elif (polygon_coords is not None) and (polygon_crs is not None):
         geo = gpd.GeoDataFrame({'geometry': Polygon(polygon_coords)}, index=[0],
                                crs=f"EPSG:{polygon_crs}")
-
     else:
         raise ValueError('Vector or Polygon needed for cropping')
 
@@ -605,10 +575,8 @@ def _load_gdal_raster(filename):
     """
     dataset = gdal.Open(filename, gdal.GA_ReadOnly)
     band = dataset.GetRasterBand(1)
-
     srs = osr.SpatialReference(wkt=dataset.GetProjection())
     geotransform = dataset.GetGeoTransform()
-
     data = band.ReadAsArray()
 
     band = None
@@ -618,7 +586,6 @@ def _load_gdal_raster(filename):
         'srs': srs,
         'geotransform': geotransform,
     }
-
     return (data, metadata)
 
 def set_raster_resolution(input_file, reference_file, output_file=None, binary=False,

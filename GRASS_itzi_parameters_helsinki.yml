@@ -29,7 +29,7 @@ merging:
   DEM_file_path_to_merge : /data/DEM_2m_HKI
 
   # Specify the searching criteria for merging the DEMs of interest
-  DEM_merge_search_criteria : "L*.tif"
+  DEM_merge_search_criteria : ["L*.tif"]
 
   # Are there more than one landcover file and they have to be merged? True or False.
   # If True, provide 'landcover_file_path_to_merge' and 'landcover_merge_search_criteria'
