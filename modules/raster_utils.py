@@ -134,7 +134,6 @@ def rain_relocation(GTiff_files_path, config):
             Path where GTiff files will be located.
         config : dictionary of the rain parameters from the config file.
 
-
         Returns
         -------
         out : file
@@ -142,8 +141,6 @@ def rain_relocation(GTiff_files_path, config):
     """
     xmin = config['x_min']
     ymax = config['y_max']
-    X_target = config['X_target']
-    Y_target = config['Y_target']
     X_radar_rain = config['X_radar_rain']
     Y_radar_rain = config['Y_radar_rain']
     search_criteria = config['relocation_search_criteria'] if config['relocation_search_criteria'] else '*.txt'
@@ -209,8 +206,8 @@ def rain_relocation(GTiff_files_path, config):
         x_new = 2 * X - x_C
         y_new = 2 * Y - y_C
 
-        Xmin = x_new - (X - X_target)
-        Ymax = y_new - (Y - Y_target)
+        Xmin = x_new - (X - config['X_target'])
+        Ymax = y_new - (Y - config['Y_target'])
 
         # Upper-left corner coordinates
         geotransform = (Xmin, xres, xrotation, Ymax, yrotation, -1*yres)
@@ -238,7 +235,6 @@ def raster_check_projection(dst_fp, ref_fp = None, optional_crs = None):
             Path of the reference file.
         optional_crs : str
             String indicating the CRS of reference. Ex: '4326' indicating EPSG:4326
-
 
         Returns
         -------
@@ -295,7 +291,6 @@ def raster_reproject(dst_fp, reproj_fp=None, ref_fp=None, optional_crs=None,
             String indicating the CRS of reference. Ex: '4326' indicating EPSG:4326
         search_criteria : list or str
             List of criteria for searhing the ascii files to be converted.
-
 
         Returns
         -------
@@ -365,7 +360,6 @@ def raster_merge(rasters_folder_path, merged_file_path, search_criteria = "L*.ti
             Path where the merged file will be located.
         search_criteria : list or str
             List of criteria for searhing the ascii files to be converted.
-
 
         Returns
         -------
@@ -438,7 +432,6 @@ def raster_crop(raster_to_crop_path, config, cropped_file_path = None, search_cr
         mask_value : float
             Value for pixels falling out of the polygon or shapefile
 
-
         Returns
         -------
         out : file
@@ -450,21 +443,19 @@ def raster_crop(raster_to_crop_path, config, cropped_file_path = None, search_cr
         crs reference system of the form "EPSG:XXXX"
         polygon_crs = XXXX
     """
-    vector_file=config['shapefile_file_path']
     x_coords=config['x_polygon_coords']
     y_coords=config['y_polygon_coords']
     polygon_crs=config['polygon_crs']
     mask_value=config['mask_value'] if config['mask_value'] else -9999.
-    mask_all_touched=True
 
     if x_coords and y_coords:
         polygon_coords = list(zip(x_coords, y_coords))
     else:
         polygon_coords = None
 
-    if vector_file is not None:
-        geo = gpd.read_file(vector_file)
-    elif (polygon_coords is not None) and (polygon_crs is not None):
+    if config['shapefile_file_path']:
+        geo = gpd.read_file(config['shapefile_file_path'])
+    elif polygon_coords and polygon_crs:
         geo = gpd.GeoDataFrame({'geometry': Polygon(polygon_coords)}, index=[0],
                                crs=f"EPSG:{polygon_crs}")
     else:
@@ -487,7 +478,7 @@ def raster_crop(raster_to_crop_path, config, cropped_file_path = None, search_cr
 
         # Clip the raster with Polygon
         out_img, out_transform = mask(dataset=data, shapes=coords, crop=True,
-                                      all_touched=mask_all_touched, nodata=mask_value)
+                                      all_touched=True, nodata=mask_value)
 
         # Copy the metadata
         out_meta = data.meta.copy()  # pylint: disable=no-member
@@ -496,7 +487,7 @@ def raster_crop(raster_to_crop_path, config, cropped_file_path = None, search_cr
                          "width": out_img.shape[2],
                          "transform": out_transform,
                          "crs": data.meta['crs']} # pylint: disable=no-member
-                                 )
+                        )
 
         if cropped_file_path is not None:
             if not cropped_file_path.suffix:
@@ -526,7 +517,6 @@ def vector_reproject(input_vector_file, reference_vector_file, output_file):
     geo1_reproj  = geo1.to_crs(geo2.crs)
     geo1_reproj.to_file(output_file)
 
-
 def vector_intersection(vector_file_1, vector_file_2, output_file):
     """
     Based on:
@@ -542,7 +532,6 @@ def vector_intersection(vector_file_1, vector_file_2, output_file):
             Path of the vector file 2.
         output_file : str
             Path of the new vector file reprojected.
-
 
         Returns
         -------
@@ -562,7 +551,6 @@ def vector_intersection(vector_file_1, vector_file_2, output_file):
 
     intersection = gpd.overlay(geo1, geo2, how = 'intersection')
     intersection.to_file(output_file)
-
 
 def _load_gdal_raster(filename):
     """[summary]
@@ -588,8 +576,24 @@ def _load_gdal_raster(filename):
     }
     return (data, metadata)
 
-def set_raster_resolution(input_file, reference_file, output_file=None, binary=False,
-                          mask_value=None):
+def write_modified_raster_to_file(input_output_file, ref_meta, ref_rows, ref_cols, new_array_2):
+    ref_proj = ref_meta.get('srs')
+    ref_geotransform = ref_meta.get('geotransform')
+    CRS_code = int(ref_proj.GetAttrValue('AUTHORITY',1))
+
+    srs = osr.SpatialReference()
+    srs.ImportFromEPSG(CRS_code)
+
+    driver = gdal.GetDriverByName('GTiff')
+    output_raster = driver.Create(input_output_file, ref_cols, ref_rows, 1 ,gdal.GDT_Float32)
+    output_raster.SetGeoTransform(ref_geotransform)
+    output_raster.SetProjection( srs.ExportToWkt() )
+    output_raster.GetRasterBand(1).WriteArray(new_array_2)
+
+    output_raster.FlushCache()
+    output_raster = None
+
+def set_raster_resolution(input_output_file, reference_file):
     """Checks the size and resolution of a given raster with respect to a reference raster.
 
         Parameters
@@ -598,19 +602,13 @@ def set_raster_resolution(input_file, reference_file, output_file=None, binary=F
             Path of the source file.
         reference_file : str
             Path of the reference file.
-        binary : bool
-            Boolean indicating if data in the input file are binary or continuous
-        mask_value : float
-            Float indicating if there is a value that should not be taking into account when
-            averaging or expanding
-
 
         Returns
         -------
         out : file
             File with same path as input file but resolution changed according to reference file
     """
-    in_array, _ = _load_gdal_raster(input_file)
+    in_array, _ = _load_gdal_raster(input_output_file)
     ref_array, ref_meta = _load_gdal_raster(reference_file)
 
     if in_array.shape == ref_array.shape:
@@ -625,21 +623,10 @@ def set_raster_resolution(input_file, reference_file, output_file=None, binary=F
     if in_rows > ref_rows:
         ratio = floor(in_rows / ref_rows)
         j = 0
-        if binary:
-            for i in range(ref_rows):
-                data_rows = in_array[j:j + ratio]
-                if mask_value is not None:
-                    data_rows = np.where(data_rows != mask_value, data_rows, 0)
-                for k in range(np.shape(data_rows)[1]):
-                    new_array[i, k] = np.bincount(data_rows[:, k]).argmax()
-                j = i * ratio
-        else:
-            for i in range(ref_rows):
-                data_rows = in_array[j:j + ratio]
-                if mask_value is not None:
-                    data_rows = np.where(data_rows != mask_value, data_rows, 0)
-                new_array[i] = np.mean(data_rows, axis = 0)
-                j = i * ratio
+        for i in range(ref_rows):
+            data_rows = np.where(data_rows != 241, in_array[j:j + ratio], 0)
+            new_array[i] = np.mean(data_rows, axis = 0)
+            j = i * ratio
     elif in_rows < ref_rows:
         ratio = floor(ref_rows / in_rows)
         j = 0
@@ -650,50 +637,20 @@ def set_raster_resolution(input_file, reference_file, output_file=None, binary=F
     if in_cols > ref_cols:
         ratio = floor(in_cols / ref_cols)
         j = 0
-        if binary:
-            for i in range(ref_cols):
-                data_cols = in_array[:, j:j + ratio]
-                if mask_value is not None:
-                    data_cols = np.where(data_cols != mask_value, data_cols, 0)
-                for k in range(np.shape(data_cols)[0]):
-                    new_array[k, i] = np.bincount(data_cols[k, :]).argmax()
-                j = i * ratio
-        else:
-            for i in range(ref_cols):
-                data_cols = in_array[:, j:j + ratio]
-                if mask_value is not None:
-                    data_cols = np.where(data_cols != mask_value, data_cols, 0)
-                new_array[:, i] = np.mean(data_cols, axis = 1)
-                j = i * ratio
+        for i in range(ref_cols):
+            data_cols = np.where(data_cols != 241, in_array[:, j:j + ratio], 0)
+            new_array[:, i] = np.mean(data_cols, axis = 1)
+            j = i * ratio
     elif in_cols < ref_cols:
         ratio = floor(ref_cols / in_cols)
         j = 0
         for i in range(ref_cols):
             at = np.transpose(in_array)
             bt = np.transpose(new_array)
-            #new_array[:, j:j + ratio] = in_array[:, i]
             bt[j:j + ratio] = at[i]
             new_array = np.transpose(bt)
             j = i * ratio
     new_array_2 = np.empty(ref_array.shape)
     new_array_2 = new_array[0:ref_rows, 0:ref_cols]
 
-    if output_file is None:
-        output_file = input_file
-
-    # Write modified raster to file
-    ref_proj = ref_meta.get('srs')
-    ref_geotransform = ref_meta.get('geotransform')
-    CRS_code = int(ref_proj.GetAttrValue('AUTHORITY',1))
-
-    srs = osr.SpatialReference()
-    srs.ImportFromEPSG(CRS_code)
-
-    driver = gdal.GetDriverByName('GTiff')
-    output_raster = driver.Create(output_file, ref_cols, ref_rows, 1 ,gdal.GDT_Float32)
-    output_raster.SetGeoTransform(ref_geotransform)
-    output_raster.SetProjection( srs.ExportToWkt() )
-    output_raster.GetRasterBand(1).WriteArray(new_array_2)
-
-    output_raster.FlushCache()
-    output_raster = None
+    write_modified_raster_to_file(input_output_file, ref_meta, ref_rows, ref_cols, new_array_2)

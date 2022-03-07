@@ -152,7 +152,7 @@ def main(config_file_name):
 
             imperviousness_file_path = imperviousness_cropped_file_path
 
-            utl.set_raster_resolution(imperviousness_file_path, landcover_cropped_file_path, binary=False, mask_value=241)
+            utl.set_raster_resolution(imperviousness_file_path, landcover_cropped_file_path)
 
         if config['rain']['infiltration_rate']:
             infiltration_output_path = config['grass_info']['grass_db'] + '/infiltration'
