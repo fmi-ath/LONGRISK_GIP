@@ -204,7 +204,7 @@ grass_input:
 
 grass_output:
   # prefix of output strds
-  prefix: helsinkivakio4
+  prefix: helsinkivakio6
   # strds to be saved, separated by comma
   values : h
   #h, wse, v, vdir, qx, qy, boundaries, infiltration, rainfall, inflow, losses, drainage_stats, verror

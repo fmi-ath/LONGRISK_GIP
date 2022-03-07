@@ -20,13 +20,8 @@ def add_missing_subfolders(config_dict):
     (Path(config_dict['grass_info']['grass_db']) / 'infiltration').mkdir(exist_ok=True)
     print('Done.')
 
-def main(config_file_name):
-    config = cm.create_config_dictionary_from_config_file(config_file_name)
-    add_missing_subfolders(config)
-    #* 1. Downdload DEMs of interest:
-    #*     - e.g. 2x2 DEM files from https://tiedostopalvelu.maanmittauslaitos.fi/tp/kartta?lang=en
-    #* 2. If the region of interest lays in the intersection of different DEMs, we can merge them into a
-    #*    single GeoTiff file:
+
+def merge_DEMs(config):
     merge_is_used = config['merging']['DEM_merge_boolean']
     if merge_is_used:
         rasters_folder_path = Path(config['folders']['DEM_files'])
@@ -35,21 +30,18 @@ def main(config_file_name):
         raster_to_crop_path = merged_file_path
     else:
         raster_to_crop_path = config['cropping']['DEM_file_path_to_crop']
-    #* 3. We would probably like to do the analysis over a specific region and not the entire map.
-    #*    Therefore, we proceed to crop the file according to a given polygon cooredinates or vector
-    #*    shapefile.
-    #*
-    #*    If vector file not given, then both polygon coordinates and crs MUST be given
+    return merge_is_used,merged_file_path,raster_to_crop_path
+
+def crop_DEMs(config, raster_to_crop_path):
     crop_is_used = config['cropping']['DEM_crop_boolean']
     if crop_is_used:
         dem_cropped_file_path = config['grass_info']['grass_db'] + '/DEM_cropped.tif'
         utl.raster_crop(raster_to_crop_path, config['cropping'],cropped_file_path=dem_cropped_file_path,
                         search_criteria=config['cropping']['DEM_crop_search_criteria'])
-    #* 3.1. Here a map describing the water depth in the initial timestep is created so that 
-    # it corresponds to the cropped DEM above or just the dem if it is not cropped.
-    input_file_for_depth_and_constant_rain = dem_cropped_file_path if crop_is_used else (merged_file_path if merge_is_used else raster_to_crop_path)
-    create_start_water_depth_file(input_file_for_depth_and_constant_rain, config['grass_info']['grass_db'] + '/start_h.tif', config)
-    #* 4. Now we proceed to extract the rain rasters
+                        
+    return crop_is_used,dem_cropped_file_path
+
+def create_rain_rasters(config, input_file_for_depth_and_constant_rain):
     if config['rain']['constant']:
         # create constant rain file
         intensity_constant = config['rain']['intensity_constant']
@@ -96,6 +88,27 @@ def main(config_file_name):
             utl.raster_crop(GTiff_files_path, config['cropping'], cropped_file_path=rain_cropped_file_path,
                             search_criteria=rain_crop_search_criteria)
             print('\nDONE\n')
+
+def main(config_file_name):
+    config = cm.create_config_dictionary_from_config_file(config_file_name)
+    add_missing_subfolders(config)
+    #* 1. Downdload DEMs of interest:
+    #*     - e.g. 2x2 DEM files from https://tiedostopalvelu.maanmittauslaitos.fi/tp/kartta?lang=en
+    #* 2. If the region of interest lays in the intersection of different DEMs, we can merge them into a
+    #*    single GeoTiff file:
+    merge_is_used, merged_file_path, raster_to_crop_path = merge_DEMs(config)
+    #* 3. We would probably like to do the analysis over a specific region and not the entire map.
+    #*    Therefore, we proceed to crop the file according to a given polygon cooredinates or vector
+    #*    shapefile.
+    #*
+    #*    If vector file not given, then both polygon coordinates and crs MUST be given
+    crop_is_used, dem_cropped_file_path = crop_DEMs(config, raster_to_crop_path)
+    #* 3.1. Here a map describing the water depth in the initial timestep is created so that 
+    # it corresponds to the cropped DEM above or just the dem if it is not cropped.
+    input_file_for_depth_and_constant_rain = dem_cropped_file_path if crop_is_used else (merged_file_path if merge_is_used else raster_to_crop_path)
+    create_start_water_depth_file(input_file_for_depth_and_constant_rain, config['grass_info']['grass_db'] + '/start_h.tif', config)
+    #* 4. Now we proceed to extract the rain rasters
+    create_rain_rasters(config, input_file_for_depth_and_constant_rain)
     #* 6. We now turn to landuse information to define: friction, losses and infiltration.
     #*    Landuse information for Finland downloaded from:
     #*    https://www.avoindata.fi/data/fi/dataset/corine-maanpeite-2018
