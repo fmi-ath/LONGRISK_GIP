@@ -28,7 +28,7 @@ def initiate_GRASS_session(grass_info):
     mygisdb = grass_info['grass_db']
     mylocation = grass_info['location']
     mymapset = grass_info['mapset']
-    CRS_code = grass_info['CRS'] if grass_info['CRS'] else 4326
+    CRS_code = grass_info['CRS'] or 4326
 
     crs_as_epsg = f'EPSG:{CRS_code}'
 
@@ -37,8 +37,7 @@ def initiate_GRASS_session(grass_info):
     # create a PERMANENT mapset; create a Session instance
     PERMANENT = Session()
     # hint: EPSG code lookup: https://epsg.io
-    PERMANENT.open(gisdb = mygisdb, location = mylocation,
-                   create_opts = crs_as_epsg)
+    PERMANENT.open(gisdb = mygisdb, location = mylocation, create_opts = crs_as_epsg)
 
     if mymapset == 'PERMANENT':
 
@@ -47,8 +46,7 @@ def initiate_GRASS_session(grass_info):
     PERMANENT.close()
 
     user = Session()
-    user.open(gisdb = mygisdb, location = mylocation, mapset = mymapset,
-                   create_opts = crs_as_epsg)
+    user.open(gisdb = mygisdb, location = mylocation, mapset = mymapset, create_opts = crs_as_epsg)
 
     return user
 
@@ -77,7 +75,6 @@ def check_remove_existing_files(maps_remove = True, datasets_remove = True):
 
     if maps_remove:
         g.remove(type = 'all', pattern = '*', flags = 'fb')
-        #g.remove(type = 'all', pattern = '*', flags = 'f')
 
     if datasets_remove:
         t.remove(flags = 'rf')
@@ -96,7 +93,6 @@ def import_multiple_raster_files(path, search_criteria = '*.tif'):
 
     for name in glob.iglob(files_path):
         gcore.run_command('r.in.gdal', input = name, output = Path(name).stem)
-
 
 def create_rain_raster_text_file(rain_raster_path, output_file, grass_time, search_criteria = '*.tif'):
     """Creates the text file needed for registering the rain rasters in the created space and time
@@ -122,9 +118,9 @@ def create_rain_raster_text_file(rain_raster_path, output_file, grass_time, sear
         out : file
             Text file with rain raster names and time intervals if indicated
     """
-    start_time=grass_time['start_time'] if grass_time['start_time'] else None
-    increment_number=int(grass_time['increment_number']) if grass_time['increment_number'] else None
-    increment_unit=grass_time['increment_unit']  if grass_time['increment_unit'] else None
+    start_time = grass_time['start_time']
+    increment_number = grass_time['increment_number']
+    increment_unit = grass_time['increment_unit']
 
     files_path = os.path.join(rain_raster_path, search_criteria)
 
@@ -140,10 +136,8 @@ def create_rain_raster_text_file(rain_raster_path, output_file, grass_time, sear
         for filename in file_list:
             _, tail = os.path.split(filename)
 
-            #print(tail)
             new_raster = os.path.splitext(tail)[0]
 
-            #print('hour: %d, minute: %d' % (hour, minute))
             f.write(new_raster)
             f.write('\n')
 
@@ -160,17 +154,14 @@ def create_rain_raster_text_file(rain_raster_path, output_file, grass_time, sear
         for filename in sorted(file_list):
             _, tail = os.path.split(filename)
 
-            #print(tail)
             new_raster = os.path.splitext(tail)[0]
 
-            #print('hour: %d, minute: %d' % (hour, minute))
             f.write(f'{new_raster}|{initial_time:%Y-%m-%d %H:%M}|{current_time:%Y-%m-%d %H:%M}\n')
 
             initial_time = current_time
             current_time += delta
 
     f.close()
-
 
 def create_itzi_config_file(config_data: dict):
     """Creates the .ini file needed for running itzi simulation according to parameters specified
@@ -188,68 +179,34 @@ def create_itzi_config_file(config_data: dict):
     out : file
         Text file with parameters for itzi simnulation
     """
-    grass_info = config_data['grass_info']
-    grass_time = config_data['grass_time']
-    grass_input = config_data['grass_input']
-    grass_output = config_data['grass_output']
-    grass_options = config_data['grass_options']
-    drainage_kws = config_data['drainage']
-    grass_statistics = config_data['grass_statistics']
-
-    grass_input['dem'] = grass_input['dem'] or 'DEM_cropped'
-    grass_input['friction'] = grass_input['friction'] or 'friction'
-    
-    if (grass_time['record_step'] is None) or (grass_input['dem'] is None) or (grass_input['friction'] is None):
-        raise ValueError('record_step, dem and friction are mandatory arguments for the simulation')
-    
     itzi_output_path = Path(config_data['folders']['itzi_output_files'])
     output_file = itzi_output_path / 'itzi_config_file.ini'
     
-    if not grass_input['start_y']:
-        grass_input['start_y'] = ''
-    if not grass_input['inflow']:
-        grass_input['inflow'] = ''
-    if not grass_input['bctype']:
-        grass_input['bctype'] = ''
-    if not grass_input['bcval']:
-        grass_input['bcval'] = ''
-    if not grass_statistics['stats_file']:
-        grass_statistics['stats_file'] = ''
-    grass_input['losses'] = grass_input['losses'] or 'losses'
-    mapset = grass_info['mapset']
-    itzi_output_path = Path(config_data['folders']['itzi_output_files'])
-    grass_output['prefix'] = grass_output['prefix'] or f'{mapset}_itzi'
-    grass_statistics['stats_file'] = grass_statistics['stats_file'] or itzi_output_path / f'{mapset}_itzi.csv'
-
-    # These values are none as they lacked a value in the former version.
-    effective_porosity=None
-    capillary_pressure=None
-    hydraulic_conductivity=None 
-    
+    grass_input = config_data['grass_input']
     input_kws = {
-        'dem': grass_input['dem'],
-        'friction': grass_input['friction'],
+        'dem': grass_input['dem'] or 'DEM_cropped',
+        'friction': grass_input['friction'] or 'friction',
         'start_h': grass_input['start_h'],
-        'start_y': grass_input['start_y'],
+        'start_y': grass_input['start_y'] or '',
         'rain': grass_input['rain'],
-        'inflow': grass_input['inflow'],
-        'bctype': grass_input['bctype'],
-        'bcval': grass_input['bcval'],
+        'inflow': grass_input['inflow'] or '',
+        'bctype': grass_input['bctype'] or '',
+        'bcval': grass_input['bcval'] or '',
         'infiltration': grass_input['infiltration'],
-        'effective_porosity': effective_porosity,
-        'capillary_pressure': capillary_pressure,
-        'hydraulic_conductivity': hydraulic_conductivity,
-        'losses': grass_input['losses'],
-    }    
-    region=None
-    mask=None
+        'effective_porosity': None,
+        'capillary_pressure': None,
+        'hydraulic_conductivity': None,
+        'losses': grass_input['losses'] or 'losses',
+    }
+
+    mapset = config_data['grass_info']['mapset']
     grass_kws = {
-        "grass_bin": grass_info['grass_bin_path'],
-        "grassdata": grass_info['grass_db'],
-        "location": grass_info['location'],
-        "mapset": grass_info['mapset'],
-        "region": region,
-        "mask": mask,
+        "grass_bin": config_data['grass_info']['grass_bin_path'],
+        "grassdata": config_data['grass_info']['grass_db'],
+        "location": config_data['grass_info']['location'],
+        "mapset": mapset,
+        "region": None,
+        "mask": None,
     }
 
     config = configparser.ConfigParser()
@@ -257,24 +214,21 @@ def create_itzi_config_file(config_data: dict):
     def _insert_in_loop(section_name, items):
         config.add_section(section_name)
         for key, value in items.items():
-            if value is not None:
+            if value:
                 config.set(section_name, key, str(value))
 
     #? TIME SECTION
     secname = 'time'
     config.add_section(secname)
 
-    # start_time -- Start of the simulation. Format yyyy-mm-dd HH:MM
-    # end_time -- End of the simulation. Format yyyy-mm-dd HH:MM
-    # duration -- Duration of the simulation. Format HH:MM:SS
-    # record_step -- Duration between two records. Format HH:MM:SS
-    if (grass_time['start_time'] is not None) and (grass_time['end_time'] is not None):
+    grass_time = config_data['grass_time']
+    if grass_time['start_time'] and grass_time['end_time']:
         config.set(secname, 'start_time', str(grass_time['start_time']))
         config.set(secname, 'end_time', str(grass_time['end_time']))
-    elif (grass_time['start_time'] is not None) and (grass_time['duration'] is not None):
+    elif grass_time['start_time'] and grass_time['duration']:
         config.set(secname, 'start_time', str(grass_time['start_time']))
         config.set(secname, 'duration', str(grass_time['duration']))
-    elif grass_time['duration'] is not None:
+    elif grass_time['duration']:
         config.set('time', 'duration', str(grass_time['duration']))
     else:
         time_error_message = ('Possible combinations for time:\n'
@@ -291,20 +245,20 @@ def create_itzi_config_file(config_data: dict):
     #? OUTPUT SECTION
     secname = 'output'
     config.add_section(secname)
-    config.set(secname, 'prefix', str(grass_output['prefix']))
-    values = grass_output['values'] if grass_output['values'] is not None else []
+    config.set(secname, 'prefix', str(config_data['grass_output']['prefix'] or f'{mapset}_itzi'))
+    values = config_data['grass_output']['values'] or []
     config.set(secname, 'values', ', '.join(values))
 
     #? STATISTICS SECTION
     secname = 'statistics'
     config.add_section(secname)
-    config.set(secname, 'stats_file', str(grass_statistics['stats_file']))
+    config.set(secname, 'stats_file', str(config_data['grass_statistics']['stats_file'] or itzi_output_path / f'{mapset}_itzi.csv'))
 
     #? OPTIONS SECTION
-    _insert_in_loop('options', grass_options)
+    _insert_in_loop('options', config_data['grass_options'])
 
     #? DRAINAGE SECTION
-    _insert_in_loop('drainage', drainage_kws)
+    _insert_in_loop('drainage', config_data['drainage'])
 
     #? GRASS SECTION
     _insert_in_loop('grass', grass_kws)
@@ -313,7 +267,6 @@ def create_itzi_config_file(config_data: dict):
     with open(output_file, "w", encoding='utf-8') as f:
         config.write(f, space_around_delimiters=True)
 
-#def GRASS_export_rasters(raster_path, output_path, search_criteria = '*'):
 def GRASS_export_rasters(output_path, mapset, search_criteria = '*'):
     """
     Based on:

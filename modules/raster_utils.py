@@ -14,7 +14,6 @@ from osgeo import gdal, osr
 
 def _ensure_list(list_or_any):
     """Check that list_or_any is a list, if not then put it into one.
-
     For example: 'string' -> ['string']"""
     if not isinstance(list_or_any, list):
         return [list_or_any]
@@ -66,27 +65,21 @@ def ascii_to_geotiff(GTiff_files_path, config):
         raise ValueError("If 'yres' not given, 'ymin' has to be given")
 
     srs = osr.SpatialReference()
-    CRS_code = config['EPSG_code'] if config['EPSG_code'] else 3067
+    CRS_code = config['EPSG_code'] or 3067
     srs.ImportFromEPSG(CRS_code)
     projection_wkt = srs.ExportToWkt()
     
-    search_criteria = config['ascii_search_criteria'] if config['ascii_search_criteria'] else '*.txt'
+    search_criteria = config['ascii_search_criteria'] or '*.txt'
     path = _glob_path(config['ascii_files_path'], search_criteria)
 
     # Figure out geotransform
     array = np.loadtxt(path[0])
     nrows, ncols = np.shape(array)
 
-    if xres is None:
-        xres = (xmax - config['x_min']) / float(ncols)
-
-    if yres is None:
-        yres = (config['y_max'] - ymin) / float(nrows)
-
-    # Upper-left corner coordinates
-
-    xrotation = config['x_rotation'] if config['x_rotation'] else 0
-    yrotation= config['y_rotation'] if config['y_rotation'] else 0
+    xres = xres or ((xmax - config['x_min']) / float(ncols))
+    yres = yres or ((config['y_max'] - ymin) / float(nrows))
+    xrotation = config['x_rotation'] or 0
+    yrotation = config['y_rotation'] or 0
     geotransform = (config['x_min'], xres, xrotation, config['y_max'], yrotation, -1 * yres)
 
     with concurrent.futures.ProcessPoolExecutor() as executor:
@@ -95,8 +88,9 @@ def ascii_to_geotiff(GTiff_files_path, config):
             p = executor.submit(_process_ascii, filename, GTiff_files_path, geotransform, projection_wkt)
             futures.append(p)
 
-def save_GTiff_raster(projection_wkt, geotransform, array, nrows, ncols, GTiff_destination_file):
-    driver = driver = gdal.GetDriverByName('GTiff')
+def save_GTiff_raster(projection_wkt, geotransform, array, GTiff_destination_file):
+    nrows, ncols = np.shape(array)
+    driver = gdal.GetDriverByName('GTiff')
     output_raster = driver.Create(GTiff_destination_file, ncols, nrows, 1 ,gdal.GDT_Float32)
     output_raster.SetGeoTransform(geotransform)
     output_raster.SetProjection(projection_wkt)
@@ -114,9 +108,8 @@ def _process_ascii(fname, output_path, geotransform, projection_wkt):
         projection_wkt (str): Projection string
     """
     array = np.loadtxt(fname)
-    nrows, ncols = array.shape
     destination_file = os.path.join(output_path, Path(fname).with_suffix('.tif').name)
-    save_GTiff_raster(geotransform, projection_wkt, array, nrows, ncols, destination_file)
+    save_GTiff_raster(geotransform, projection_wkt, array, destination_file)
 
 def rain_relocation(GTiff_files_path, config):
     """Relocates a desired pixel region of the image (X_radar_rain, Y_radar_rain) to a desired
@@ -133,9 +126,9 @@ def rain_relocation(GTiff_files_path, config):
         out : file
             GTiff relocated file
     """
-    CRS_code = config['EPSG_code'] if config['EPSG_code'] else 3067
-    xrotation = config['x_rotation'] if config['x_rotation'] else 0
-    yrotation = config['y_rotation'] if config['y_rotation'] else 0
+    CRS_code = config['EPSG_code'] or 3067
+    xrotation = config['x_rotation'] or 0
+    yrotation = config['y_rotation'] or 0
     
     xres=config['x_res']
     xmax=config['x_max']
@@ -170,17 +163,15 @@ def rain_relocation(GTiff_files_path, config):
         dataset = None
 
         nrows, ncols = np.shape(array)
-        if xres is None:
-            xres = (xmax - config['x_min']) / float(ncols)
-        if yres is None:
-            yres = (config['y_max'] - ymin) / float(nrows)
+        xres = xres or ((xmax - config['x_min']) / float(ncols))
+        yres = yres or ((config['y_max'] - ymin) / float(nrows))
         Xmin = config['X_target'] - (ncols / 2 * xres + config['X_radar_rain'])
         Ymax = config['Y_target'] + (nrows / 2 * yres - config['Y_radar_rain'])
         geotransform = (Xmin, xres, xrotation, Ymax, yrotation, -1*yres)
 
         GTiff_destination_file = os.path.join(GTiff_files_path,f'{Path(filename).stem}_relocated.tif')
 
-        save_GTiff_raster(projection_wkt, geotransform, array, nrows, ncols, GTiff_destination_file)
+        save_GTiff_raster(projection_wkt, geotransform, array, GTiff_destination_file)
 
 def raster_check_projection(dst_fp, ref_fp = None, optional_crs = None):
     """Checks the projection of a given raster with respect to a reference raster or reference CRS.
@@ -395,7 +386,7 @@ def raster_crop(raster_to_crop_path, config, cropped_file_path = None, search_cr
     x_coords=config['x_polygon_coords']
     y_coords=config['y_polygon_coords']
     polygon_crs=config['polygon_crs']
-    mask_value=config['mask_value'] if config['mask_value'] else -9999.
+    mask_value=config['mask_value'] or -9999.
 
     if x_coords and y_coords:
         polygon_coords = list(zip(x_coords, y_coords))
@@ -463,7 +454,7 @@ def vector_reproject(input_vector_file, reference_vector_file, output_file):
     """
     geo1 = gpd.read_file(input_vector_file)
     geo2 = gpd.read_file(reference_vector_file)
-    geo1_reproj  = geo1.to_crs(geo2.crs)
+    geo1_reproj = geo1.to_crs(geo2.crs)
     geo1_reproj.to_file(output_file)
 
 def vector_intersection(vector_file_1, vector_file_2, output_file):
@@ -525,14 +516,12 @@ def _load_gdal_raster(filename):
     }
     return (data, metadata)
 
-def write_modified_raster_to_file(input_output_file, ref_meta, ref_rows, ref_cols, new_array_2):
-    ref_proj = ref_meta.get('srs')
-    ref_geotransform = ref_meta.get('geotransform')
+def write_modified_raster_to_file(input_output_file, ref_meta, new_array_2):
+    ref_proj = ref_meta['srs']
     CRS_code = int(ref_proj.GetAttrValue('AUTHORITY',1))
-
     srs = osr.SpatialReference()
     srs.ImportFromEPSG(CRS_code)
-    save_GTiff_raster(srs.ExportToWkt(), ref_geotransform, new_array_2, ref_rows, ref_cols, input_output_file)
+    save_GTiff_raster(srs.ExportToWkt(), ref_meta['geotransform'], new_array_2, input_output_file)
 
 def process_raster_widths(in_array, ref_cols, in_cols, new_array):
     if in_cols > ref_cols:
@@ -591,4 +580,4 @@ def set_raster_resolution(input_output_file, reference_file):
     new_array = process_raster_heights(in_array, ref_rows, in_rows, new_array)
     new_array = process_raster_widths(in_array, ref_cols, in_cols, new_array)
     
-    write_modified_raster_to_file(input_output_file, ref_meta, ref_rows, ref_cols, new_array[0:ref_rows, 0:ref_cols])
+    write_modified_raster_to_file(input_output_file, ref_meta, new_array[0:ref_rows, 0:ref_cols])

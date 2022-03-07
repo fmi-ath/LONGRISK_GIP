@@ -20,7 +20,6 @@ def add_missing_subfolders(config_dict):
     (Path(config_dict['grass_info']['grass_db']) / 'infiltration').mkdir(exist_ok=True)
     print('Done.')
 
-
 def merge_DEMs(config):
     merge_is_used = config['merging']['DEM_merge_boolean']
     if merge_is_used:
@@ -41,7 +40,51 @@ def crop_DEMs(config, raster_to_crop_path):
                         
     return crop_is_used,dem_cropped_file_path
 
-def create_rain_rasters(config, input_file_for_depth_and_constant_rain):
+def set_up_rain_rasters(config):
+    GTiff_files_path = config['rain']['GTiff_files_path']
+
+    if GTiff_files_path:
+        rain_crop_search_criteria = config['rain']['rain_crop_search_criteria']
+    elif config['rain']['ascii_files_path']:
+        print('\nRain data is in ascii format and its being converted to Tif format...\n')
+        GTiff_files_path = config['folders']['temporary_files']+'/rain'
+        utl.ascii_to_geotiff(GTiff_files_path, config['rain'])
+        print('\nDONE\n')
+    else:
+        raise ValueError('No rain data path provided')
+
+    if config['rain']['rain_relocation']:
+        print('\nRain data is being relocated...\n')
+        utl.rain_relocation(GTiff_files_path, config['rain'])
+        rain_crop_search_criteria = '*_relocated.tif'
+    print('\nDONE\n')
+    return GTiff_files_path,rain_crop_search_criteria
+
+def reproject_rain_rasters(config, GTiff_files_path, rain_crop_search_criteria):
+    reference_file_path = config['grass_info']['grass_db'] + '/DEM_cropped.tif'
+    if Path(GTiff_files_path).suffix == '':
+        source_fname = next(glob.iglob(f"{GTiff_files_path}/*.tif"))  # we need only one file
+        reproj = utl.raster_check_projection(source_fname, ref_fp = reference_file_path)
+    else:
+        reproj = utl.raster_check_projection(GTiff_files_path, ref_fp = reference_file_path)
+
+    if reproj:
+        root_reproj_rain_file = config['folders']['temporary_files'] + '/rain'
+        print('\nRain file(s) being reprojected to match DEMs projection...\n')
+        utl.raster_reproject(GTiff_files_path, reproj_fp=root_reproj_rain_file,
+                                ref_fp=reference_file_path, search_criteria=rain_crop_search_criteria)
+        rain_crop_search_criteria = "*_reproj.tif"
+    return rain_crop_search_criteria
+
+def crop_rain_rasters(config, GTiff_files_path, rain_crop_search_criteria):
+    if config['rain']['rain_crop_boolean']:
+        print('\nRain files are being cropped...\n')
+        rain_cropped_file_path = config['grass_info']['grass_db'] + '/rain'
+        utl.raster_crop(GTiff_files_path, config['cropping'], cropped_file_path=rain_cropped_file_path,
+                            search_criteria=rain_crop_search_criteria)
+        print('\nDONE\n')
+
+def extract_rain_rasters(config, input_file_for_depth_and_constant_rain):
     if config['rain']['constant']:
         # create constant rain file
         intensity_constant = config['rain']['intensity_constant']
@@ -49,45 +92,10 @@ def create_rain_rasters(config, input_file_for_depth_and_constant_rain):
         rain_dem, rain_profile = wdm.single_dem(input_file_for_depth_and_constant_rain)
         wdm.write_watermap_to_output(np.ones_like(rain_dem) * intensity_constant, rain_output_file_path, rain_profile)
     else:
-        GTiff_files_path = config['rain']['GTiff_files_path']
-
-        if GTiff_files_path:
-            rain_crop_search_criteria = config['rain']['rain_crop_search_criteria']
-        elif config['rain']['ascii_files_path']:
-            print('\nRain data is in ascii format and its being converted to Tif format...\n')
-            GTiff_files_path = config['folders']['temporary_files']+'/rain'
-            utl.ascii_to_geotiff(GTiff_files_path, config['rain'])
-            print('\nDONE\n')
-        else:
-            raise ValueError('No rain data path provided')
-
-        if config['rain']['rain_relocation']:
-            print('\nRain data is being relocated...\n')
-            utl.rain_relocation(GTiff_files_path, config['rain'])
-            rain_crop_search_criteria = '*_relocated.tif'
-
-        print('\nDONE\n')
+        GTiff_files_path, rain_crop_search_criteria = set_up_rain_rasters(config)
         #* 5. Let's check if the rain rasters have same projection as raster of interest
-        reference_file_path = config['grass_info']['grass_db'] + '/DEM_cropped.tif'
-        if Path(GTiff_files_path).suffix == '':
-            source_fname = next(glob.iglob(f"{GTiff_files_path}/*.tif"))  # we need only one file
-            reproj = utl.raster_check_projection(source_fname, ref_fp = reference_file_path)
-        else:
-            reproj = utl.raster_check_projection(GTiff_files_path, ref_fp = reference_file_path)
-
-        if reproj:
-            root_reproj_rain_file = config['folders']['temporary_files'] + '/rain'
-            print('\nRain file(s) being reprojected to match DEMs projection...\n')
-            utl.raster_reproject(GTiff_files_path, reproj_fp=root_reproj_rain_file,
-                                ref_fp=reference_file_path, search_criteria=rain_crop_search_criteria)
-            rain_crop_search_criteria = "*_reproj.tif"
-
-        if config['rain']['rain_crop_boolean']:
-            print('\nRain files are being cropped...\n')
-            rain_cropped_file_path = config['grass_info']['grass_db'] + '/rain'
-            utl.raster_crop(GTiff_files_path, config['cropping'], cropped_file_path=rain_cropped_file_path,
-                            search_criteria=rain_crop_search_criteria)
-            print('\nDONE\n')
+        rain_crop_search_criteria = reproject_rain_rasters(config, GTiff_files_path, rain_crop_search_criteria)
+        crop_rain_rasters(config, GTiff_files_path, rain_crop_search_criteria)
 
 def main(config_file_name):
     config = cm.create_config_dictionary_from_config_file(config_file_name)
@@ -100,7 +108,6 @@ def main(config_file_name):
     #* 3. We would probably like to do the analysis over a specific region and not the entire map.
     #*    Therefore, we proceed to crop the file according to a given polygon cooredinates or vector
     #*    shapefile.
-    #*
     #*    If vector file not given, then both polygon coordinates and crs MUST be given
     crop_is_used, dem_cropped_file_path = crop_DEMs(config, raster_to_crop_path)
     #* 3.1. Here a map describing the water depth in the initial timestep is created so that 
@@ -108,7 +115,7 @@ def main(config_file_name):
     input_file_for_depth_and_constant_rain = dem_cropped_file_path if crop_is_used else (merged_file_path if merge_is_used else raster_to_crop_path)
     create_start_water_depth_file(input_file_for_depth_and_constant_rain, config['grass_info']['grass_db'] + '/start_h.tif', config)
     #* 4. Now we proceed to extract the rain rasters
-    create_rain_rasters(config, input_file_for_depth_and_constant_rain)
+    extract_rain_rasters(config, input_file_for_depth_and_constant_rain)
     #* 6. We now turn to landuse information to define: friction, losses and infiltration.
     #*    Landuse information for Finland downloaded from:
     #*    https://www.avoindata.fi/data/fi/dataset/corine-maanpeite-2018
