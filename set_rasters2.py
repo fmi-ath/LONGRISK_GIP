@@ -35,7 +35,9 @@ def crop_DEMs(config, raster_to_crop_path):
     crop_is_used = config['cropping']['DEM_crop_boolean']
     if crop_is_used:
         dem_cropped_file_path = config['grass_info']['grass_db'] + '/DEM_cropped.tif'
-        utl.raster_crop(raster_to_crop_path, config['cropping'],cropped_fp=dem_cropped_file_path,
+        utl.raster_crop(raster_to_crop_path, 
+                        config['cropping'],
+                        cropped_fp=dem_cropped_file_path,
                         search_criteria=config['cropping']['DEM_crop_search_criteria'])
                         
     return crop_is_used,dem_cropped_file_path
@@ -129,9 +131,8 @@ def main(config_file_name):
     #*    But if its for the first time, do it!
     landcover_to_crop_path = config['cropping']['landcover_file_path_to_crop']
     if config['merging']['landcover_merge_boolean']:
-        landcover_folder_path = config['merging']['landcover_file_path_to_merge']
         merged_file_path = config['folders']['temporary_files'] + '/landcover_merged.tif'
-        utl.raster_merge(landcover_folder_path, 
+        utl.raster_merge(config['merging']['landcover_file_path_to_merge'], 
                          merged_file_path, 
                          search_criteria=config['merging']['landcover_merge_search_criteria'])
         landcover_to_crop_path = merged_file_path
@@ -163,18 +164,18 @@ def main(config_file_name):
                              imperviousness_fp, 
                              search_criteria=config['merging']['imperviousness_merge_search_criteria'])
 
-        reproj_imp_file = config['folders']['temporary_files'] + '/imperviousness_reproj.tif'
         reproj = utl.raster_check_projection(imperviousness_fp, ref_fp=dem_cropped_fp)
         if reproj:
             print('\nImperviousness file is being reprojected to match DEMs projection...\n')
             utl.raster_reproject(imperviousness_fp, 
-                                 reproj_fp=reproj_imp_file,
+                                 reproj_fp=config['folders']['temporary_files'] + '/imperviousness_reproj.tif',
                                  ref_fp=dem_cropped_fp)
-            imperviousness_fp = reproj_imp_file
+            imperviousness_fp = config['folders']['temporary_files'] + '/imperviousness_reproj.tif'
 
         if config['cropping']['imperviousness_crop_boolean']:
             imperviousness_cropped_file_path = config['grass_info']['grass_db'] + '/imperviousness_cropped.tif'
-            utl.raster_crop(imperviousness_fp,config['cropping'],
+            utl.raster_crop(imperviousness_fp,
+                            config['cropping'],
                             cropped_fp=imperviousness_cropped_file_path,
                             search_criteria=config['cropping']['imperviousness_crop_search_criteria'])
 
@@ -183,7 +184,7 @@ def main(config_file_name):
             utl.set_raster_resolution(imperviousness_fp, landcover_crop_fp)
         
         infiltration_output_path = config['grass_info']['grass_db']
-        if config['rain']['infiltration_rate']:
+        if config['rain']['infiltration_rate']: 
             infiltration_output_path += '/infiltration'
 
         landcover.get_infiltration(imperviousness_fp, 

@@ -19,7 +19,8 @@ def ensure_folders_exist(config) -> None:
         if not p.suffix:
             p.mkdir(parents=True, exist_ok=True)
 
-def save_GTiff_raster(projection_wkt, geotransform, array, GTiff_destination_file):
+def save_GTiff_raster(projection_wkt, geotransform, array, 
+                      GTiff_destination_file):
     nrows, ncols = np.shape(array)
     driver = gdal.GetDriverByName('GTiff')
     output_raster = driver.Create(GTiff_destination_file, ncols, nrows, 1 ,gdal.GDT_Float32)

@@ -119,7 +119,7 @@ def create_rain_raster_text_file(rain_raster_path, output_file, grass_time, sear
             Text file with rain raster names and time intervals if indicated
     """
     start_time = grass_time['start_time']
-    increment_number = grass_time['increment_number']
+    increment_number = int(grass_time['increment_number'])
     increment_unit = grass_time['increment_unit']
 
     files_path = os.path.join(rain_raster_path, search_criteria)
@@ -252,7 +252,8 @@ def create_itzi_config_file(config_data: dict):
     #? STATISTICS SECTION
     secname = 'statistics'
     config.add_section(secname)
-    config.set(secname, 'stats_file', str(config_data['grass_statistics']['stats_file'] or itzi_output_path / f'{mapset}_itzi.csv'))
+    config.set(secname, 
+               'stats_file', str(config_data['grass_statistics']['stats_file'] or itzi_output_path / f'{mapset}_itzi.csv'))
 
     #? OPTIONS SECTION
     _insert_in_loop('options', config_data['grass_options'])

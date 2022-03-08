@@ -9,7 +9,9 @@ def set_up_start_h_file_if_specified(config):
     start_h = config['grass_input']['start_h']
     if not start_h:
         return ''
-    gcore.run_command('r.in.gdal', input = Path(config['grass_info']['grass_db']) / start_h, output = start_h)
+    gcore.run_command('r.in.gdal', 
+                      input = Path(config['grass_info']['grass_db']) / start_h, 
+                      output = start_h)
     return Path(start_h).stem
 
 def create_gisrc_file_for_grass_if_needed(grass_info):
@@ -29,20 +31,18 @@ def create_gisrc_file_for_grass_if_needed(grass_info):
             f.write(rcstr)
 
 def set_up_mapset_path(grass_info):
-    grassdata_path = Path(grass_info['grass_db'])
-    mapset_path = Path(os.path.join(grassdata_path, grass_info['location'], grass_info['mapset']))
+    mapset_path = Path(os.path.join(grass_info['grass_db'],
+                                    grass_info['location'], 
+                                    grass_info['mapset']))
     if mapset_path.exists():
         subprocess.call(["rm", "-r", str(mapset_path)])
 
 def add_all_relevant_rasters_to_grass(config):
     mapset = config['grass_info']['mapset'] 
     g.list(flags = 'p', type = 'raster')
-    grutl.import_multiple_raster_files(Path(config['grass_info']['grass_db']))
-    # Set the region to match the raster of interest
+    grutl.import_multiple_raster_files(config['grass_info']['grass_db'])
     g.region(raster = f'DEM_cropped@{mapset}')
-    # We would like to mask data that falls outside the boundaries for the simulation
     r.mask(raster = f'DEM_cropped@{mapset}')
-    # If you would like to check the imported files
     g.list(flags = 'p', type = 'raster')
     config['grass_input']['start_h'] = set_up_start_h_file_if_specified(config)
 
@@ -51,32 +51,42 @@ def set_up_infiltration(config):
         config['grass_input']['infiltration'] = 'infiltration_0'
         if config['rain']['infiltration_rate']:
             inf_stds = 'infiltration_minutely'
-            t.create(output=inf_stds, semantictype='mean', title='Infiltration Rate', description='Infiltration rate data for itzi')
-            infiltration_path = Path(config['grass_info']['grass_db']) / 'infiltration'
-            grutl.import_multiple_raster_files(infiltration_path)
-            infiltration_txt_file = infiltration_path / 'infiltration_registering_data.txt'
-            grutl.create_rain_raster_text_file(infiltration_path, infiltration_txt_file, config['grass_time'])
-            t.register(type = 'raster', input = inf_stds, file = str(infiltration_txt_file))
+            t.create(output=inf_stds, 
+                     semantictype='mean', 
+                     title='Infiltration Rate', 
+                     description='Infiltration rate data for itzi')
+            infil_path = config['grass_info']['grass_db'] + '/infiltration'
+            grutl.import_multiple_raster_files(infil_path)
+            infil_txt_file = infil_path + '/infiltration_registering_data.txt'
+            grutl.create_rain_raster_text_file(infil_path, 
+                                               infil_txt_file, 
+                                               config['grass_time'])
+            t.register(type='raster', input=inf_stds, file=infil_txt_file)
             config['grass_input']['infiltration'] = inf_stds
 
 def set_up_rain(config):
     if config['rain']['constant']:
-        stds = 'constant_rain.tif'
-        gcore.run_command('r.in.gdal', input = Path(config['grass_info']['grass_db']) / stds, output = stds)
-        return Path(stds).stem
-    stds = 'rain_minutely'
-    t.create(output=stds, semantictype='mean', title='Rain Rate', description='Rain rate data for itzi')
+        gcore.run_command('r.in.gdal', 
+                          input = config['grass_info']['grass_db'] + '/constant_rain.tif', 
+                          output = 'constant_rain.tif')
+        return config['grass_info']['grass_db'] + '/constant_rain'
+    t.create(output='rain_minutely', 
+             semantictype='mean', 
+             title='Rain Rate', 
+             description='Rain rate data for itzi')
     #* 4.1. Import the minutely recorded radar rain events.
-    rain_path = Path(config['grass_info']['grass_db']) / 'rain'
+    rain_path = config['grass_info']['grass_db'] + '/rain'
     grutl.import_multiple_raster_files(rain_path)
     g.list(flags = 'p', type = 'raster')
     #* 4.2. Register the minutely rain radar data in the time and space dataset created previously.
     #*    As there are many files and the only way grass allows registering many files at once is with a
     #*    .txt file indicating the name of the files, we will first create the file and then register.
-    rain_txt_file = rain_path / 'rain_registering_data.txt'
-    grutl.create_rain_raster_text_file(rain_path, rain_txt_file, config['grass_time'])
-    t.register(type = 'raster', input = stds, file = str(rain_txt_file))
-    return stds
+    rain_txt_file = rain_path + '/rain_registering_data.txt'
+    grutl.create_rain_raster_text_file(rain_path, 
+                                       rain_txt_file, 
+                                       config['grass_time'])
+    t.register(type = 'raster', input = 'rain_minutely', file = rain_txt_file)
+    return 'rain_minutely'
 
 def main(config_filename):
     config = cm.create_config_dictionary_from_config_file(config_filename)

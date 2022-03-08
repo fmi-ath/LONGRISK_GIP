@@ -283,7 +283,7 @@ def raster_reproject(dst_fp, reproj_fp=None, ref_fp=None, optional_crs=None,
                         resampling=Resampling.nearest
                     )
 
-def raster_merge(rasters_folder_path, merged_file_path, search_criteria = "L*.tif"):
+def raster_merge(rasters_folder_path, merge_fp, search_criteria = "L*.tif"):
     """ Merges a set of rasters into one raster.
 
     Based on:
@@ -304,7 +304,7 @@ def raster_merge(rasters_folder_path, merged_file_path, search_criteria = "L*.ti
             Merged file
     """
     # File and folder paths
-    out_fp = os.path.join(merged_file_path)
+    out_fp = os.path.join(merge_fp)
 
     # Remove any suffix to replicate pre-refactoring behaviour here
     path_no_suffix = Path(rasters_folder_path).with_suffix('')
