@@ -11,6 +11,7 @@ from rasterio.merge import merge
 from shapely.geometry import Polygon
 import geopandas as gpd
 from osgeo import gdal, osr
+from modules.common import save_GTiff_raster
 
 def _ensure_list(list_or_any):
     """Check that list_or_any is a list, if not then put it into one.
@@ -88,16 +89,6 @@ def ascii_to_geotiff(GTiff_files_path, config):
             p = executor.submit(_process_ascii, filename, GTiff_files_path, geotransform, projection_wkt)
             futures.append(p)
 
-def save_GTiff_raster(projection_wkt, geotransform, array, GTiff_destination_file):
-    nrows, ncols = np.shape(array)
-    driver = gdal.GetDriverByName('GTiff')
-    output_raster = driver.Create(GTiff_destination_file, ncols, nrows, 1 ,gdal.GDT_Float32)
-    output_raster.SetGeoTransform(geotransform)
-    output_raster.SetProjection(projection_wkt)
-    output_raster.GetRasterBand(1).WriteArray(array)
-    output_raster.FlushCache()
-    output_raster = None
-
 def _process_ascii(fname, output_path, geotransform, projection_wkt):
     """Convert ascii file to geotiff
 
@@ -168,9 +159,7 @@ def rain_relocation(GTiff_files_path, config):
         Xmin = config['X_target'] - (ncols / 2 * xres + config['X_radar_rain'])
         Ymax = config['Y_target'] + (nrows / 2 * yres - config['Y_radar_rain'])
         geotransform = (Xmin, xres, xrotation, Ymax, yrotation, -1*yres)
-
         GTiff_destination_file = os.path.join(GTiff_files_path,f'{Path(filename).stem}_relocated.tif')
-
         save_GTiff_raster(projection_wkt, geotransform, array, GTiff_destination_file)
 
 def raster_check_projection(dst_fp, ref_fp = None, optional_crs = None):
@@ -355,7 +344,7 @@ def getFeatures(gdf):
     """
     return [json.loads(gdf.to_json())['features'][0]['geometry']]
 
-def raster_crop(raster_to_crop_path, config, cropped_file_path = None, search_criteria = "*.tif"):
+def raster_crop(raster_to_crop_path, config, cropped_fp = None, search_criteria = "*.tif"):
     """Crop a raster or set of rasters according to shapefile or Polygon.
 
     Based on:
@@ -367,7 +356,7 @@ def raster_crop(raster_to_crop_path, config, cropped_file_path = None, search_cr
             Path of raster file(s) to crop.
         config: dict
             Dictionary of the values related to the cropping section of the config file.
-        cropped_file_path : str
+        cropped_fp : str
             Path where the cropped file(s) will be located.
         search_criteria : list or str
             List of criteria for searhing the ascii files to be converted.
@@ -403,8 +392,8 @@ def raster_crop(raster_to_crop_path, config, cropped_file_path = None, search_cr
 
     path = _glob_path(raster_to_crop_path, search_criteria)
 
-    if cropped_file_path:
-        cropped_file_path = Path(cropped_file_path)
+    if cropped_fp:
+        cropped_fp = Path(cropped_fp)
 
     for input_file in path:
         input_file = Path(input_file)
@@ -421,19 +410,19 @@ def raster_crop(raster_to_crop_path, config, cropped_file_path = None, search_cr
                                       all_touched=True, nodata=mask_value)
 
         # Copy the metadata
-        out_meta = data.meta.copy()  # pylint: disable=no-member
+        out_meta = data.meta.copy()
         out_meta.update({"driver": "GTiff",
                          "height": out_img.shape[1],
                          "width": out_img.shape[2],
                          "transform": out_transform,
-                         "crs": data.meta['crs']} # pylint: disable=no-member
+                         "crs": data.meta['crs']}
                         )
 
-        if cropped_file_path:
-            if not cropped_file_path.suffix:
-                output_fp = cropped_file_path / f'{input_file.stem}_cropped.tif'
+        if cropped_fp:
+            if not cropped_fp.suffix:
+                output_fp = cropped_fp / f'{input_file.stem}_cropped.tif'
             else:
-                output_fp = cropped_file_path
+                output_fp = cropped_fp
         else:
             output_fp = input_file.with_name(f'{input_file.stem}_cropped.tif')
 
@@ -523,7 +512,8 @@ def write_modified_raster_to_file(input_output_file, ref_meta, new_array_2):
     srs.ImportFromEPSG(CRS_code)
     save_GTiff_raster(srs.ExportToWkt(), ref_meta['geotransform'], new_array_2, input_output_file)
 
-def process_raster_widths(in_array, ref_cols, in_cols, new_array):
+def process_raster_widths(in_array, ref_cols, new_array):
+    _, in_cols = in_array.shape
     if in_cols > ref_cols:
         ratio = floor(in_cols / ref_cols)
         for i in range(ref_cols):
@@ -539,7 +529,8 @@ def process_raster_widths(in_array, ref_cols, in_cols, new_array):
             new_array = np.transpose(bt)
     return new_array
 
-def process_raster_heights(in_array, ref_rows, in_rows, new_array):
+def process_raster_heights(in_array, ref_rows, new_array):
+    in_rows, _ = in_array.shape
     if in_rows > ref_rows:
         ratio = floor(in_rows / ref_rows)
         for i in range(ref_rows):
@@ -577,7 +568,9 @@ def set_raster_resolution(input_output_file, reference_file):
     in_rows, in_cols = in_array.shape
 
     new_array = np.empty((in_rows, in_cols))
-    new_array = process_raster_heights(in_array, ref_rows, in_rows, new_array)
-    new_array = process_raster_widths(in_array, ref_cols, in_cols, new_array)
+    new_array = process_raster_heights(in_array, ref_rows, new_array)
+    new_array = process_raster_widths(in_array, ref_cols, new_array)
     
-    write_modified_raster_to_file(input_output_file, ref_meta, new_array[0:ref_rows, 0:ref_cols])
+    write_modified_raster_to_file(input_output_file, 
+                                  ref_meta, 
+                                  new_array[0:ref_rows, 0:ref_cols])

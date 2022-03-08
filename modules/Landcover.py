@@ -4,10 +4,10 @@ from pathlib import Path
 
 from osgeo import gdal, osr
 import numpy as np
+from modules.common import save_GTiff_raster
 
 class Landcover:
     """Landcover object"""
-
     def __init__(self, root_landcover_file):
         """Initialize a Landcover object.
 
@@ -17,17 +17,15 @@ class Landcover:
             Root path of the landcover tif file.
         ----------
         """
-
         dataset = gdal.Open(root_landcover_file, gdal.GA_ReadOnly)
         proj = osr.SpatialReference(wkt = dataset.GetProjection())
         band = dataset.GetRasterBand(1) # Note GetRasterBand() takes band no. starting from 1 not 0
         arr = band.ReadAsArray()
 
-        self._root = Path(root_landcover_file).resolve() # Resolve to remove relative paths
+        self._root = Path(root_landcover_file).resolve()
         self._arr = arr
-        self._shape = arr.shape
         self._geotransform = dataset.GetGeoTransform()
-        self._crs_code = int(proj.GetAttrValue('AUTHORITY',1)) # get the EPSG number as integer
+        self._crs_code = int(proj.GetAttrValue('AUTHORITY',1))
         self._crs = f'EPSG:{self._crs_code}'
         self._crs_wkt = proj.ExportToWkt()
 
@@ -39,11 +37,8 @@ class Landcover:
 
         Store results to 'friction.tif'.
         """
-
         arr = self._arr
-
-        new_arr = np.zeros(self._shape)
-
+        new_arr = np.zeros(arr.shape)
         # Landcover category and its friction value
         singles = (
             (14, 0.04),
@@ -72,27 +67,20 @@ class Landcover:
         for start, stop, value in ranges:
             new_arr[(arr >= start) & (arr <= stop)] = value
 
-        #geotransform = dataset.GetGeoTransform()
         output_file = os.path.join(self._root.parent, 'friction.tif')
-        self._write_raster_file(output_file, new_arr)
-
+        save_GTiff_raster(self._crs_wkt, self._geotransform, new_arr, output_file)
 
     def get_losses(self):
         """Calculate losses at each pixel according to Landcover's file category.
-
         Store results to 'losses.tif'.
         """
-
         arr = self._arr
-
         # Only classes from 1 to 7 and 11 have value 10, others have value of 0
         new_arr = np.where(((arr >= 1) & (arr <= 7)) + (arr == 11), 10, 0)
-
         output_file = os.path.join(self._root.parent, 'losses.tif')
-        self._write_raster_file(output_file, new_arr)
+        save_GTiff_raster(self._crs_wkt, self._geotransform, new_arr, output_file)
 
-
-    def get_infiltration(self, imperviousness_file_path, rain_file_path, output_folder,
+    def get_infiltration(self, imperviousness_fp, rain_fp, output_folder,
                          infiltration_rate=True):
         """Calculates friction at each pixel according to Landcover's file category.
 
@@ -115,14 +103,13 @@ class Landcover:
 
         Infiltration would be 1 - runoff coefficient
         """
-
         arr = self._arr
 
-        dataset = gdal.Open(imperviousness_file_path, gdal.GA_ReadOnly)
+        dataset = gdal.Open(imperviousness_fp, gdal.GA_ReadOnly)
         imperviousness_arr = dataset.GetRasterBand(1).ReadAsArray()
         dataset = None
 
-        infiltration_arr = np.zeros(self._shape)
+        infiltration_arr = np.zeros(arr.shape)
 
         # This is about two orders of magnitude faster than the previous double loop
         infiltration_arr[(arr >= 1) & (arr <= 7)] = np.clip(imperviousness_arr[(arr >= 1) & (arr <= 7)], 65, 95) / 100  # pylint: disable=line-too-long
@@ -138,15 +125,13 @@ class Landcover:
         infiltration_arr = np.round(infiltration_arr, 2)  # Round for prettier output
 
         if not infiltration_rate:
-            self._write_raster_file(filename=os.path.join(output_folder, 'infiltration.tif'),
-                                    array=infiltration_arr)
-
+            save_GTiff_raster(self._crs_wkt, self._geotransform, infiltration_arr, os.path.join(output_folder, 'infiltration.tif'))
             return
 
-        if not Path(rain_file_path).suffix:
-            rain_files = sorted(glob.glob(os.path.join(rain_file_path, '*.tif')))
+        if not Path(rain_fp).suffix:
+            rain_files = sorted(glob.glob(os.path.join(rain_fp, '*.tif')))
         else:
-            rain_files = sorted(glob.glob(rain_file_path))
+            rain_files = sorted(glob.glob(rain_fp))
 
         for i, t in enumerate(rain_files):
             rain_dataset = gdal.Open(t, gdal.GA_ReadOnly)
@@ -157,28 +142,5 @@ class Landcover:
 
             infil_rate = infiltration_arr * av_rain
 
-            #file_name = os.path.splitext(os.path.split(t)[1])[0]
-            #file_time = file_name[4:8]
-
             output_file = os.path.join(output_folder, f'infiltration_{i:0>4}.tif')
-            self._write_raster_file(output_file, infil_rate)
-
-
-    def _write_raster_file(self, filename, array, dtype=gdal.GDT_Float32):
-        """Convenience function to write a calculated raster to a GeoTiff file.
-
-        Args:
-            filename (str): Path to the output file
-            array (numpy.array): Raster image to-be-written
-            dtype (gdal constant, optional): GDAL Data type for the file. Defaults to
-                                             gdal.GDT_Float32.
-        """
-        driver = gdal.GetDriverByName('GTiff')
-
-        raster = driver.Create(filename, self._shape[1], self._shape[0], 1, dtype)
-        raster.SetGeoTransform(self._geotransform)  # Specify its coordinates
-        raster.SetProjection(self._crs_wkt)   # Exports the coordinate system to the file
-        raster.GetRasterBand(1).WriteArray(array)   # Writes my array to the raster
-
-        raster.FlushCache()
-        raster = None
+            save_GTiff_raster(self._crs_wkt, self._geotransform, infil_rate, output_file)

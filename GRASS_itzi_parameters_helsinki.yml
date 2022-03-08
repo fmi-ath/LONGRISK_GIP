@@ -143,7 +143,7 @@ rain:
   # Want to crop the rain file same as DEM files? True or False.
   rain_crop_boolean : True
 
-  # Does infiltration has to be calculated as space time raster dataset from rain measurements?
+  # Does infiltration need to be calculated as space time raster dataset from rain measurements?
   infiltration_rate : True
 
   # Does one want to set up constant rainfield. In this case ASCII and GTiff rain files are neglected.
