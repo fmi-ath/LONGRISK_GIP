@@ -137,7 +137,7 @@ def rain_relocation(GTiff_files_path, config):
 
     search_criteria = config['relocation_search_criteria'] if config['relocation_search_criteria'] else '*.txt'
     path = _glob_path(GTiff_files_path, search_criteria)
-
+    
     for filename in path:
         # This prevents extra relocated files.
         if fnmatch.fnmatch(filename, '*relocated*'):
@@ -146,6 +146,11 @@ def rain_relocation(GTiff_files_path, config):
         # Note GetRasterBand() takes band no. starting from 1 not 0
         dataset = gdal.Open(filename, gdal.GA_ReadOnly)
         # proj = osr.SpatialReference(wkt = dataset.GetProjection())
+        if not dataset:
+            print(filename)
+            dataset = None
+            continue
+    
         geotransform = dataset.GetGeoTransform()
         band = dataset.GetRasterBand(1)
         array = band.ReadAsArray()
@@ -160,7 +165,7 @@ def rain_relocation(GTiff_files_path, config):
         Ymax = config['Y_target'] + (nrows / 2 * yres - config['Y_radar_rain'])
         geotransform = (Xmin, xres, xrotation, Ymax, yrotation, -1*yres)
         GTiff_destination_file = os.path.join(GTiff_files_path,f'{Path(filename).stem}_relocated.tif')
-        save_GTiff_raster(projection_wkt, geotransform, array, GTiff_destination_file)
+        save_GTiff_raster(projection_wkt, geotransform, array, GTiff_destination_file, driver=gdal.GetDriverByName('GTiff'))
 
 def raster_check_projection(dst_fp, ref_fp = None, optional_crs = None):
     """Checks the projection of a given raster with respect to a reference raster or reference CRS.

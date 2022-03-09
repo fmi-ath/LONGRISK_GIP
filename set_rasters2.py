@@ -57,7 +57,7 @@ def set_up_rain_rasters(config):
 
     if config['rain']['rain_relocation']:
         print('\nRain data is being relocated...\n')
-        utl.rain_relocation(GTiff_files_path, config['rain'])
+        utl.rain_relocation(Path(GTiff_files_path), config['rain'])
         rain_crop_search_criteria = '*_relocated.tif'
     print('\nDONE\n')
     return GTiff_files_path,rain_crop_search_criteria

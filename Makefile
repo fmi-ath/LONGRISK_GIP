@@ -5,7 +5,7 @@ generate:
 	
 run_raster:
 	@echo "\n--> Setting DEM, landcover (friction, losses, infiltration) and rain rasters <--\n"
-	@python3 -W ignore set_rasters.py GRASS_itzi_parameters.ini
+	@python3 -W ignore set_rasters2.py GRASS_itzi_parameters_helsinki.yml
 	
 run_rain:
 	@echo "\n--> Setting rain rasters <--\n"
@@ -13,7 +13,7 @@ run_rain:
 	
 run_grass:
 	@echo "\n--> Setting GRASS environment <--\n"
-	@python3 -W ignore set_GRASS.py GRASS_itzi_parameters.ini
+	@python3 -W ignore set_GRASS2.py GRASS_itzi_parameters_helsinki.yml
 	
 run_itzi:
 	@echo "\n--> Running itzi... <--\n"
@@ -23,7 +23,7 @@ run_itzi:
 	
 run_export:
 	@echo "\n--> Exporting itzi output files... <--\n"
-	@python3 -W ignore export_itzi_output.py GRASS_itzi_parameters.ini
+	@python3 -W ignore export_itzi_output2.py GRASS_itzi_parameters.ini
 
 clean_temp: 
 	@rm -r GRASS_itzi/temp

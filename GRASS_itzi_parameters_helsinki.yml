@@ -147,7 +147,7 @@ rain:
   infiltration_rate : True
 
   # Does one want to set up constant rainfield. In this case ASCII and GTiff rain files are neglected.
-  constant : True
+  constant : False
   ## In units mm/h
   intensity_constant : 100.0
 
@@ -204,7 +204,7 @@ grass_input:
 
 grass_output:
   # prefix of output strds
-  prefix: helsinkivakio6
+  prefix: helsinki_itzi
   # strds to be saved, separated by comma
   values : h
   #h, wse, v, vdir, qx, qy, boundaries, infiltration, rainfall, inflow, losses, drainage_stats, verror
