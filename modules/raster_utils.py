@@ -91,7 +91,6 @@ def ascii_to_geotiff(GTiff_files_path, config):
 
 def _process_ascii(fname, output_path, geotransform, projection_wkt):
     """Convert ascii file to geotiff
-
     Args:
         fname (file, str, pathlib.Path): ASCII file
         output_path (str or pathlib.Path): Output folder
@@ -99,8 +98,19 @@ def _process_ascii(fname, output_path, geotransform, projection_wkt):
         projection_wkt (str): Projection string
     """
     array = np.loadtxt(fname)
+    nrows, ncols = array.shape
+
     destination_file = os.path.join(output_path, Path(fname).with_suffix('.tif').name)
-    save_GTiff_raster(geotransform, projection_wkt, array, destination_file)
+    # Tätä ei voinut koodata uudelleen siten että käytti alla olevalle apufunktiota. 
+    # Syy on varmaan että funktio ei suoritu heti vaan menee suoritus pinoon tjsp.
+    driver = gdal.GetDriverByName('GTiff')
+    output_raster = driver.Create(destination_file, ncols, nrows, 1, gdal.GDT_Float32)
+    output_raster.SetGeoTransform(geotransform)
+    output_raster.SetProjection(projection_wkt)
+    output_raster.GetRasterBand(1).WriteArray(array)
+
+    output_raster.FlushCache()
+    output_raster = None
 
 def rain_relocation(GTiff_files_path, config):
     """Relocates a desired pixel region of the image (X_radar_rain, Y_radar_rain) to a desired

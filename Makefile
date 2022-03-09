@@ -1,4 +1,4 @@
-all: generate run_raster run_grass run_itzi run_export clean_infil
+all: run_raster run_grass run_itzi run_export clean_infil
 
 generate: 
 	@mkdir GRASS_itzi GRASS_itzi/temp GRASS_itzi/temp/rain GRASS_itzi/itzi_files GRASS_itzi/grassdata GRASS_itzi/grassdata/rain GRASS_itzi/grassdata/infiltration
