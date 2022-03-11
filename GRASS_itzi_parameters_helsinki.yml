@@ -170,9 +170,9 @@ grass_info:
 
 grass_time:
   # Start of the simulation. Format yyyy-mm-dd HH:MM
-  start_time : 2011-07-02 17:00
+  start_time : 2011-07-02 00:00
   # End of the simulation. Format yyyy-mm-dd HH:MM
-  end_time : 2011-07-02 17:15
+  end_time : 2011-07-02 23:59
   # Time increment for creating the .txt file for registering rain files. Ex: data taken minutely
   increment_number : 1
   increment_unit : minutes
