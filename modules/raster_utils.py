@@ -97,20 +97,8 @@ def _process_ascii(fname, output_path, geotransform, projection_wkt):
         geotransform (tuple): GDAL GeoTransform tuple
         projection_wkt (str): Projection string
     """
-    array = np.loadtxt(fname)
-    nrows, ncols = array.shape
-
     destination_file = os.path.join(output_path, Path(fname).with_suffix('.tif').name)
-    # Tätä ei voinut koodata uudelleen siten että käytti alla olevalle apufunktiota. 
-    # Syy on varmaan että funktio ei suoritu heti vaan menee suoritus pinoon tjsp.
-    driver = gdal.GetDriverByName('GTiff')
-    output_raster = driver.Create(destination_file, ncols, nrows, 1, gdal.GDT_Float32)
-    output_raster.SetGeoTransform(geotransform)
-    output_raster.SetProjection(projection_wkt)
-    output_raster.GetRasterBand(1).WriteArray(array)
-
-    output_raster.FlushCache()
-    output_raster = None
+    save_GTiff_raster(projection_wkt, geotransform, np.loadtxt(fname), destination_file)
 
 def rain_relocation(GTiff_files_path, config):
     """Relocates a desired pixel region of the image (X_radar_rain, Y_radar_rain) to a desired
@@ -175,7 +163,7 @@ def rain_relocation(GTiff_files_path, config):
         Ymax = config['Y_target'] + (nrows / 2 * yres - config['Y_radar_rain'])
         geotransform = (Xmin, xres, xrotation, Ymax, yrotation, -1*yres)
         GTiff_destination_file = os.path.join(GTiff_files_path,f'{Path(filename).stem}_relocated.tif')
-        save_GTiff_raster(projection_wkt, geotransform, array, GTiff_destination_file, driver=gdal.GetDriverByName('GTiff'))
+        save_GTiff_raster(projection_wkt, geotransform, array, GTiff_destination_file)
 
 def raster_check_projection(dst_fp, ref_fp = None, optional_crs = None):
     """Checks the projection of a given raster with respect to a reference raster or reference CRS.
